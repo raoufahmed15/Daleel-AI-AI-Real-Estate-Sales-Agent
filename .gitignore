@@ -1,0 +1,7 @@
+.idea/
+*.iml
+__pycache__/
+*.py[cod]
+.pytest_cache/
+/backend/.venv/
+/backend/daleel.db

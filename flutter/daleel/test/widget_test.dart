@@ -1,30 +1,51 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:daleel/main.dart';
+import 'package:daleel_ai/core/providers.dart';
+import 'package:daleel_ai/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('Daleel dashboard starts successfully',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1200, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          dashboardProvider.overrideWith(
+            (ref) async => {
+              'calculated': {
+                'leads_by_status': {'new': 1},
+                'leads_total': 1,
+                'properties_available': 0,
+                'bookings_upcoming': 0,
+                'bookings_scheduled_total': 0,
+                'bookings_cancelled': 0,
+                'crm_activities_total': 0,
+                'leads_fully_qualified': 0,
+                'leads_opted_out': 0,
+              },
+              'unavailable_ai_metrics': <Map<String, dynamic>>[],
+            },
+          ),
+        ],
+        child: const DaleelApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    expect(find.byType(NavigationRail), findsOneWidget);
+    expect(find.text('Daleel AI'), findsOneWidget);
+    expect(find.text('Calculated from stored records'), findsOneWidget);
+    expect(find.text('Total leads'), findsOneWidget);
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    tester.view.physicalSize = const Size(1200, 500);
+    await tester.pumpAndSettle();
+    expect(find.byType(NavigationRail), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 }
