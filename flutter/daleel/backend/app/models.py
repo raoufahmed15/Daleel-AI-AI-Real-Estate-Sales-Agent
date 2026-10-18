@@ -25,6 +25,9 @@ class Lead(Base):
     down_payment: Mapped[int | None] = mapped_column(Integer, nullable=True)
     monthly_installment: Mapped[int | None] = mapped_column(Integer, nullable=True)
     purchase_timeline: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    purchase_purpose: Mapped[str | None] = mapped_column(String(20), nullable=True)  # live | invest
+    source: Mapped[str | None] = mapped_column(String(40), nullable=True)  # ad | project_page | direct
+    channel: Mapped[str | None] = mapped_column(String(40), nullable=True)  # web_chat | whatsapp_sandbox | voice
     # Consent
     consent_status: Mapped[str] = mapped_column(String(10), default="unknown")
     opted_out: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -38,6 +41,8 @@ class Lead(Base):
     bookings = relationship("Booking", back_populates="lead", cascade="all, delete-orphan",
                             order_by="Booking.start.desc()")
     handoffs = relationship("Handoff", back_populates="lead", order_by="Handoff.id.desc()")
+    conversations = relationship("Conversation", back_populates="lead", cascade="all, delete-orphan",
+                                 order_by="Conversation.id.desc()")
 
 
 class Property(Base):
@@ -54,6 +59,10 @@ class Property(Base):
     delivery_date: Mapped[str | None] = mapped_column(String(10), nullable=True)  # YYYY-MM-DD
     payment_plan: Mapped[str | None] = mapped_column(Text, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    readiness: Mapped[str | None] = mapped_column(String(20), nullable=True)  # off_plan | ready_to_move
+    source_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    source_updated_at: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    source_version: Mapped[str | None] = mapped_column(String(40), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
@@ -100,3 +109,42 @@ class Activity(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     lead = relationship("Lead", back_populates="activities")
+
+
+class Conversation(Base):
+    """WhatsApp-sandbox / web-chat thread. No real messaging provider is called."""
+    __tablename__ = "conversations"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    lead_id: Mapped[int] = mapped_column(ForeignKey("leads.id", ondelete="CASCADE"), index=True)
+    channel: Mapped[str] = mapped_column(String(40), default="whatsapp_sandbox")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+    lead = relationship("Lead", back_populates="conversations")
+    messages = relationship("Message", back_populates="conversation", cascade="all, delete-orphan",
+                            order_by="Message.id")
+
+
+class Message(Base):
+    __tablename__ = "messages"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    conversation_id: Mapped[int] = mapped_column(ForeignKey("conversations.id", ondelete="CASCADE"), index=True)
+    role: Mapped[str] = mapped_column(String(20))  # user | assistant | system
+    text: Mapped[str] = mapped_column(Text)
+    citations_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    module_gaps_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    conversation = relationship("Conversation", back_populates="messages")
+
+
+class DiscountBand(Base):
+    """Owner-entered, versioned commercial rules. The agent never negotiates outside these."""
+    __tablename__ = "discount_bands"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    version: Mapped[str] = mapped_column(String(40))
+    min_pct: Mapped[float] = mapped_column(Float, default=0)
+    max_pct: Mapped[float] = mapped_column(Float)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

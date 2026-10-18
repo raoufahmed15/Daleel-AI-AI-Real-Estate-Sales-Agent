@@ -32,8 +32,10 @@ def metrics(db: Session) -> dict:
             "crm_activities_total": count(select(Activity.id)),
         },
         "unavailable_ai_metrics": [
-            {"name": "Lead scores", "status": "not_implemented", "module": "lead_scoring"},
-            {"name": "Recommendation match rate", "status": "not_implemented", "module": "recommendation_engine"},
-            {"name": "RAG answer quality", "status": "not_implemented", "module": "rag"},
+            {"name": "Lead Scoring PR-AUC", "status": "not_implemented", "module": "lead_scoring"},
+            {"name": "Recommendation Precision@3", "status": "not_implemented", "module": "recommendation_engine"},
+            {"name": "RAG supported-answer rate", "status": "not_implemented", "module": "rag"},
+            {"name": "STT / TTS quality", "status": "not_implemented", "module": "stt"},
+            {"name": "OCR extraction quality", "status": "not_implemented", "module": "ocr"},
         ],
     }

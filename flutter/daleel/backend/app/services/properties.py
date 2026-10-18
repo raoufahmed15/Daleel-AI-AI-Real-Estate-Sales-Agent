@@ -43,6 +43,7 @@ def _next_code(db: Session) -> str:
 def create(db: Session, data) -> Property:
     values = data.model_dump()
     values["delivery_date"] = values["delivery_date"].isoformat() if values["delivery_date"] else None
+    values["source_updated_at"] = values["source_updated_at"].isoformat() if values.get("source_updated_at") else None
     values["code"] = values["code"] or _next_code(db)
     if db.scalar(select(Property.id).where(Property.code == values["code"])):
         raise AppError(409, "duplicate_code", f"Property code {values['code']} already exists")
@@ -55,7 +56,7 @@ def create(db: Session, data) -> Property:
 def update(db: Session, property_id: int, data) -> Property:
     p = get_property(db, property_id)
     for k, v in data.model_dump(exclude_unset=True).items():
-        if k == "delivery_date":
+        if k in ("delivery_date", "source_updated_at"):
             v = v.isoformat() if v else None
         if v is None and k in ("title", "property_type", "location", "availability"):
             raise AppError(422, "validation_error", f"{k} cannot be null")

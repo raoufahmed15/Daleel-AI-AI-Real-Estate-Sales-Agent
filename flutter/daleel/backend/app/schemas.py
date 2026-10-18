@@ -16,7 +16,11 @@ HandoffStatus = Literal["open", "in_review", "resolved", "dismissed"]
 
 LEAD_STATUSES = ["new", "contacted", "qualified", "viewing_scheduled", "negotiation", "won", "lost"]
 QUALIFICATION_FIELDS = ["budget", "preferred_location", "property_type", "down_payment",
-                        "monthly_installment", "purchase_timeline"]
+                        "monthly_installment", "purchase_timeline", "purchase_purpose"]
+LeadSource = Literal["ad", "project_page", "direct"]
+LeadChannel = Literal["web_chat", "whatsapp_sandbox", "voice"]
+PurchasePurpose = Literal["live", "invest"]
+Readiness = Literal["off_plan", "ready_to_move"]
 
 
 class ORM(BaseModel):
@@ -49,6 +53,7 @@ class QualificationFields(BaseModel):
     down_payment: int | None = Field(None, ge=0)
     monthly_installment: int | None = Field(None, ge=0)
     purchase_timeline: Timeline | None = None
+    purchase_purpose: PurchasePurpose | None = None
 
     _c = field_validator("preferred_location", mode="before")(_clean)
 
@@ -61,6 +66,8 @@ class LeadBase(QualificationFields):
     priority: Priority = "medium"
     conversation_summary: str | None = None
     next_steps: str | None = None
+    source: LeadSource | None = None
+    channel: LeadChannel | None = None
 
     @field_validator("name", mode="before")
     @classmethod
@@ -94,6 +101,9 @@ class LeadUpdate(BaseModel):
     down_payment: int | None = Field(None, ge=0)
     monthly_installment: int | None = Field(None, ge=0)
     purchase_timeline: Timeline | None = None
+    purchase_purpose: PurchasePurpose | None = None
+    source: LeadSource | None = None
+    channel: LeadChannel | None = None
 
     _v1 = field_validator("phone", "email", "conversation_summary", "next_steps", mode="before")(_clean)
     _v3 = field_validator("phone")(_check_phone)
@@ -126,6 +136,9 @@ class LeadOut(ORM):
     down_payment: int | None
     monthly_installment: int | None
     purchase_timeline: str | None
+    purchase_purpose: str | None
+    source: str | None
+    channel: str | None
     consent_status: str
     opted_out: bool
     conversation_summary: str | None
@@ -153,8 +166,12 @@ class PropertyBase(BaseModel):
     delivery_date: date | None = None
     payment_plan: str | None = None
     description: str | None = None
+    readiness: Readiness | None = None
+    source_name: str | None = Field(None, max_length=120)
+    source_updated_at: date | None = None
+    source_version: str | None = Field(None, max_length=40)
 
-    _c = field_validator("payment_plan", "description", mode="before")(_clean)
+    _c = field_validator("payment_plan", "description", "source_name", "source_version", mode="before")(_clean)
 
 
 class PropertyCreate(PropertyBase):
@@ -172,6 +189,10 @@ class PropertyUpdate(BaseModel):
     delivery_date: date | None = None
     payment_plan: str | None = None
     description: str | None = None
+    readiness: Readiness | None = None
+    source_name: str | None = Field(None, max_length=120)
+    source_updated_at: date | None = None
+    source_version: str | None = Field(None, max_length=40)
 
 
 class PropertyOut(ORM):
@@ -187,6 +208,10 @@ class PropertyOut(ORM):
     delivery_date: str | None
     payment_plan: str | None
     description: str | None
+    readiness: str | None
+    source_name: str | None
+    source_updated_at: str | None
+    source_version: str | None
 
 
 class ActivityCreate(BaseModel):
@@ -284,3 +309,53 @@ class CrmOut(BaseModel):
     bookings: list[BookingOut]
     handoffs: list[HandoffOut]
     open_handoff_status: str | None
+
+
+class Citation(BaseModel):
+    source: str
+    text: str
+
+
+class ConversationCreate(BaseModel):
+    lead_id: int
+    channel: LeadChannel = "whatsapp_sandbox"
+
+
+class ChatMessageIn(BaseModel):
+    text: str = Field(..., min_length=1, max_length=4000)
+
+
+class ChatMessageOut(BaseModel):
+    id: int
+    role: str
+    text: str
+    citations: list[Citation] = []
+    module_gaps: list[str] = []
+    created_at: datetime
+
+
+class ConversationOut(BaseModel):
+    id: int
+    lead_id: int
+    channel: str
+    created_at: datetime
+    messages: list[ChatMessageOut]
+    lead: LeadOut
+
+
+class DiscountBandIn(BaseModel):
+    version: str = Field(..., min_length=1, max_length=40)
+    min_pct: float = Field(0, ge=0, le=100)
+    max_pct: float = Field(..., ge=0, le=100)
+    notes: str | None = None
+    active: bool = True
+
+
+class DiscountBandOut(ORM):
+    id: int
+    version: str
+    min_pct: float
+    max_pct: float
+    notes: str | None
+    active: bool
+    created_at: datetime

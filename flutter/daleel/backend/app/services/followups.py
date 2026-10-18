@@ -10,7 +10,7 @@ from .leads import missing_qualification
 
 LABELS = {"budget": "budget", "preferred_location": "preferred location", "property_type": "property type",
           "down_payment": "down payment", "monthly_installment": "monthly installment capacity",
-          "purchase_timeline": "purchase timeline"}
+          "purchase_timeline": "purchase timeline", "purchase_purpose": "purchase purpose (live or invest)"}
 
 
 def suggest(db: Session, lead_id: int) -> FollowUpOut:
