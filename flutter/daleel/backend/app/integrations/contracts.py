@@ -3,6 +3,7 @@
 A future module registers `handler(request) -> response` on the registry.
 Until then every request returns an explicit `not_implemented` response; nothing is invented.
 """
+from datetime import date
 from typing import Any, Callable, Literal
 
 from pydantic import BaseModel, Field
@@ -58,6 +59,8 @@ class RagEvidence(BaseModel):
     text: str
     source: str
     score: float | None = None
+    source_updated_at: date | None = None
+    source_version: str | None = Field(None, max_length=40)
 
 
 class RagResponse(BaseModel):
@@ -128,14 +131,14 @@ MODULES = {
         "description": "Local scoring model. Receives a lead id and returns a score with visible reasons.",
         "request": LeadScoringRequest, "response": LeadScoringResponse,
         "route": "/api/integrations/lead-scoring/score",
-        "slot": "Drop your synthetic-trained scorer here. Hot-lead handoff never uses a fabricated score.",
+        "slot": "Drop your trained local scorer here. Hot-lead handoff never uses a fabricated score.",
     },
     "rag": {
         "title": "RAG (Retrieval-Augmented Generation)",
-        "description": "Your trained knowledge base over inventory, brochures and price lists. Must return citations.",
+        "description": "Your trained knowledge base over inventory, brochures and price lists. Return dated, versioned citations.",
         "request": RagRequest, "response": RagResponse,
         "route": "/api/integrations/rag/query",
-        "slot": "Drop your vector store + retriever here. Price/availability/payment answers require this or a sourced inventory row.",
+        "slot": "Drop your vector store + retriever here. Commercial answers require dated, versioned citations or a sourced inventory row.",
     },
     "stt": {
         "title": "Speech-to-Text",

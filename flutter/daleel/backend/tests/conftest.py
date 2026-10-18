@@ -1,9 +1,14 @@
+import os
 from datetime import datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import create_app
+# Importing the ASGI app constructs its default engine; keep tests off the local database.
+os.environ["DALEEL_DATABASE_URL"] = "sqlite://"
+os.environ["DALEEL_AUTO_SEED"] = "0"
+
+from app.main import create_app  # noqa: E402
 
 
 @pytest.fixture()

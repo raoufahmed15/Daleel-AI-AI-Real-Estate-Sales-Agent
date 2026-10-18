@@ -16,6 +16,17 @@ class Repository {
   Future<Json> integrations() async => await api.get('/api/integrations') as Json;
   Future<Json> settings() async => await api.get('/api/settings') as Json;
 
+  // Conversation sandbox. No messages are sent to an external provider.
+  Future<Conversation> openConversation(int leadId, String channel) async =>
+      Conversation.fromJson(await api.post('/api/conversations', body: {
+        'lead_id': leadId,
+        'channel': channel,
+      }) as Json);
+  Future<Conversation> sendMessage(int conversationId, String text) async =>
+      Conversation.fromJson(await api.post(
+          '/api/conversations/$conversationId/messages',
+          body: {'text': text}) as Json);
+
   // Leads
   Future<PageResult<Lead>> leads({String? q, String? status, int limit = 200}) async =>
       _page(await api.get('/api/leads', query: {'q': q, 'status': status, 'limit': limit}), Lead.fromJson);

@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func, select
 
 from . import config
-from .api import bookings, handoffs, leads, properties, system
+from .api import bookings, conversations, guardrails, handoffs, leads, properties, system
 from .database import init_db, make_engine, make_session_factory
 from .errors import install_handlers
 from .integrations.contracts import ModuleRegistry
@@ -13,7 +13,7 @@ from .models import Lead
 
 
 def create_app(database_url: str | None = None, auto_seed: bool | None = None) -> FastAPI:
-    app = FastAPI(title="Daleel AI - Demo AI Real Estate Sales Assistant", version=config.APP_VERSION,
+    app = FastAPI(title="Daleel AI - Real Estate Sales Sandbox", version=config.APP_VERSION,
                   description=config.DEMO_NOTICE)
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
     install_handlers(app)
@@ -30,7 +30,7 @@ def create_app(database_url: str | None = None, auto_seed: bool | None = None) -
             if not db.scalar(select(func.count()).select_from(Lead)):
                 seed_database(db)
 
-    # Optional extension point: the user later adds app/extensions/__init__.py with `register(registry)`.
+    # Local providers are optional; the checked-in extension hook registers none by default.
     try:
         ext = importlib.import_module("app.extensions")
     except ModuleNotFoundError as e:
@@ -39,7 +39,8 @@ def create_app(database_url: str | None = None, auto_seed: bool | None = None) -
     else:
         ext.register(app.state.registry)
 
-    for r in (system.router, leads.router, properties.router, bookings.router, handoffs.router):
+    for r in (system.router, leads.router, properties.router, bookings.router, handoffs.router,
+              conversations.router, guardrails.router):
         app.include_router(r)
     return app
 

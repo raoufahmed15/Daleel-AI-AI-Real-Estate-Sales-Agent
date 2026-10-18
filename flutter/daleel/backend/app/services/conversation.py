@@ -8,12 +8,14 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import date
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..integrations.contracts import (
     LlmAgentRequest, ModuleNotConfigured, RagRequest, RecommendationRequest, ChatTurn,
 )
+from ..errors import AppError
 from ..models import Conversation, DiscountBand, Lead, Message, Property
 from ..schemas import ChatMessageOut, Citation, ConversationOut, HandoffCreate, LeadOut
 from .common import get_lead, log_activity
@@ -114,6 +116,8 @@ def open_conversation(db: Session, lead_id: int, channel: str, registry) -> Conv
     ).first()
     if existing:
         return existing
+    if lead.opted_out:
+        raise AppError(409, "lead_opted_out", "This lead opted out. No new conversation can be started.")
     conv = Conversation(lead_id=lead.id, channel=channel)
     db.add(conv)
     db.flush()
@@ -135,7 +139,9 @@ def _call(registry, name, payload):
     if handler is None:
         return None, "not_implemented"
     try:
-        return handler(payload), "ok"
+        from ..integrations.contracts import MODULES
+        result = handler(payload)
+        return MODULES[name]["response"].model_validate(result), "ok"
     except ModuleNotConfigured:
         return None, "not_configured"
 
@@ -206,16 +212,32 @@ def _ask_next(lead: Lead) -> str | None:
 
 
 def _inventory_cite(p: Property) -> tuple[str, list[dict], bool]:
-    if not p.source_name or not p.source_updated_at:
+    if not p.source_name or not p.source_updated_at or not p.source_version:
         return (
-            f"Unit {p.code} is in inventory but has no trusted source/date, so I will not quote a commercial figure. "
+            f"Unit {p.code} is in inventory but has no trusted source/date/version, so I will not quote a commercial figure. "
+            "A sales reviewer must confirm.",
+            [],
+            True,
+        )
+    try:
+        source_date = date.fromisoformat(p.source_updated_at)
+    except ValueError:
+        return (
+            f"Unit {p.code} has an invalid source date, so I will not quote a commercial figure. "
+            "A sales reviewer must confirm.",
+            [],
+            True,
+        )
+    if source_date > date.today():
+        return (
+            f"Unit {p.code} has a future source date, so I will not quote a commercial figure. "
             "A sales reviewer must confirm.",
             [],
             True,
         )
     bits = [f"Unit {p.code} ({p.title})."]
     cites = []
-    src = f"{p.source_name} · {p.source_updated_at} · {p.source_version or 'unversioned'}"
+    src = f"{p.source_name} · {p.source_updated_at} · {p.source_version}"
     if p.price is not None:
         bits.append(f"Listed price: {p.price:,} EGP.")
         cites.append({"source": src, "text": f"{p.code} price {p.price}"})
@@ -249,6 +271,8 @@ def _hard_filter(db: Session, lead: Lead, limit=5) -> list[Property]:
 def post_message(db: Session, conversation_id: int, text: str, registry) -> Conversation:
     conv = get_conversation(db, conversation_id)
     lead = conv.lead
+    if lead.opted_out:
+        raise AppError(409, "lead_opted_out", "This lead opted out. No further chat messages are allowed.")
     _add(db, conv, "user", text.strip())
     reply, citations, gaps, actions = _decide(db, conv, lead, text.strip(), registry)
     _add(db, conv, "assistant", reply, citations=citations, gaps=gaps)
@@ -324,11 +348,22 @@ def _decide(db: Session, conv: Conversation, lead: Lead, text: str, registry):
     if code_hit or any(m in low for m in COMMERCIAL_MARKERS):
         rag_body, rag_st = _call(registry, "rag", RagRequest(question=text, lead_id=lead.id))
         if rag_st == "ok" and rag_body is not None:
-            body = rag_body if isinstance(rag_body, dict) else rag_body.model_dump()
-            citations = [{"source": s, "text": s} for s in body.get("sources", [])]
-            for ev in body.get("evidence", []):
-                citations.append({"source": ev.get("source", "rag"), "text": ev.get("text", "")[:240]})
-            return body.get("answer") or IDENTITY, citations, gaps, actions
+            body = rag_body.model_dump()
+            verified_evidence = [
+                ev for ev in body.get("evidence", [])
+                if ev.get("source_updated_at")
+                and ev["source_updated_at"] <= date.today()
+                and ev.get("source_version")
+            ]
+            if verified_evidence and body.get("answer"):
+                citations = [
+                    {
+                        "source": f"{ev['source']} · {ev['source_updated_at']} · {ev['source_version']}",
+                        "text": ev["text"][:240],
+                    }
+                    for ev in verified_evidence
+                ]
+                return body["answer"], citations, gaps, actions
         gaps.append("rag")
         if code_hit:
             p = db.scalars(select(Property).where(Property.code == code_hit.group(0).upper())).first()
@@ -343,7 +378,8 @@ def _decide(db: Session, conv: Conversation, lead: Lead, text: str, registry):
                 return msg, cites, gaps, actions
         return (
             "Price, availability and payment plans only come from a trusted inventory row (with source + date) "
-            "or from your RAG knowledge base. RAG is not connected yet, and I did not find a unit code such as DLL-0001. "
+            "or from your RAG knowledge base with a source, update date and version. "
+            "RAG is not connected or did not return verifiable citations, and I did not find a unit code such as DLL-0001. "
             "I will not invent a figure."
         ), citations, gaps, actions
 

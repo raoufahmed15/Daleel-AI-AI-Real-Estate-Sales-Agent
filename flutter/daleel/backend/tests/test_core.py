@@ -1,5 +1,3 @@
-import importlib.util
-
 from sqlalchemy import func, select
 
 from app.main import create_app
@@ -268,6 +266,27 @@ def test_handoff_validation_and_all_categories(client):
         assert client.post("/api/handoffs", json={"category": cat, "reason": "needs review"}).status_code == 201
 
 
+# ---- Discount guardrails -----------------------------------------------------
+def test_discount_band_api_is_available_and_validates_ranges(client):
+    assert client.get("/api/guardrails/discount-bands").json() == []
+    created = client.post(
+        "/api/guardrails/discount-bands",
+        json={"version": "v1", "min_pct": 0, "max_pct": 5, "active": True},
+    )
+    assert created.status_code == 201
+    band = created.json()
+    updated = client.put(
+        f"/api/guardrails/discount-bands/{band['id']}",
+        json={"version": "v2", "min_pct": 1, "max_pct": 4, "active": True},
+    )
+    assert updated.status_code == 200 and updated.json()["version"] == "v2"
+    invalid = client.post(
+        "/api/guardrails/discount-bands",
+        json={"version": "invalid", "min_pct": 8, "max_pct": 5},
+    )
+    assert invalid.status_code == 422
+
+
 # ---- Dashboard ---------------------------------------------------------------
 def test_dashboard_reflects_stored_data(client):
     d = lambda: client.get("/api/dashboard").json()
@@ -293,10 +312,20 @@ def test_dashboard_on_seed(seeded):
 # ---- Excluded modules --------------------------------------------------------
 def test_excluded_modules_report_not_integrated(client):
     mods = client.get("/api/integrations").json()["modules"]
-    assert {m["module"] for m in mods} == {"recommendation_engine", "lead_scoring", "rag"}
-    assert all(m["status"] == "not_implemented" and m["label"] == "Not integrated yet" for m in mods)
-    for url, body in (("recommendation-engine/query", {"budget": 1}), ("lead-scoring/score", {"lead_id": 1}),
-                      ("rag/query", {"question": "What is the delivery date?"})):
+    assert {m["module"] for m in mods} == {
+        "recommendation_engine", "lead_scoring", "rag", "stt", "tts", "ocr", "llm_agent"
+    }
+    assert all(m["status"] == "not_implemented" and m["label"] == "Not integrated yet"
+               and m["integration_slot"] for m in mods)
+    for url, body in (
+        ("recommendation-engine/query", {"budget": 1}),
+        ("lead-scoring/score", {"lead_id": 1}),
+        ("rag/query", {"question": "What is the delivery date?"}),
+        ("stt/transcribe", {"audio_ref": "local://clip.wav"}),
+        ("tts/speak", {"text": "Test reply"}),
+        ("ocr/extract", {"document_name": "brochure.pdf", "document_ref": "local://brochure.pdf"}),
+        ("llm-agent/chat", {"messages": [{"role": "user", "text": "Hello"}]}),
+    ):
         r = client.post(f"/api/integrations/{url}", json=body)
         assert r.status_code == 501 and r.json()["status"] == "not_implemented"
         assert "score" not in r.json() and "items" not in r.json() and "answer" not in r.json()
@@ -304,12 +333,17 @@ def test_excluded_modules_report_not_integrated(client):
     assert client.get("/api/settings").json()["external_ai_calls_enabled"] is False
 
 
-def test_startup_without_excluded_module_sources():
-    assert importlib.util.find_spec("app.extensions") is None
-    a = create_app("sqlite://", auto_seed=True)
+def test_startup_is_empty_by_default_and_extension_hook_is_ready():
+    a = create_app("sqlite://")
     c = TestClient(a)
     assert c.get("/api/health").json()["status"] == "ok"
-    assert c.get("/api/leads").json()["total"] == 30
+    assert c.get("/api/leads").json()["total"] == 0
+    assert c.get("/api/properties").json()["total"] == 0
+
+
+def test_explicit_auto_seed_remains_opt_in():
+    a = create_app("sqlite://", auto_seed=True)
+    assert TestClient(a).get("/api/leads").json()["total"] == 30
 
 
 def test_registry_contract_when_module_is_registered(app, client):
@@ -330,3 +364,115 @@ def test_registry_contract_when_module_is_registered(app, client):
         assert False
     except KeyError:
         pass
+
+
+def test_registered_modules_validate_responses(client, app):
+    from app.integrations.contracts import ModuleNotConfigured
+
+    app.state.registry.register(
+        "stt",
+        lambda request: {"transcript": "sample transcript", "confidence": 0.9},
+    )
+    response = client.post("/api/integrations/stt/transcribe", json={"audio_ref": "local://clip.wav"})
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "integrated",
+        "transcript": "sample transcript",
+        "confidence": 0.9,
+    }
+
+    app.state.registry.register("ocr", lambda request: (_ for _ in ()).throw(
+        ModuleNotConfigured("OCR model path is not configured")
+    ))
+    response = client.post(
+        "/api/integrations/ocr/extract",
+        json={"document_name": "brochure.pdf"},
+    )
+    assert response.status_code == 503
+    assert response.json()["status"] == "not_configured"
+
+
+def test_conversation_sandbox_records_opt_out_and_blocks_later_chat(client):
+    lead = mk_lead(client)
+    opened = client.post(
+        "/api/conversations",
+        json={"lead_id": lead["id"], "channel": "whatsapp_sandbox"},
+    )
+    assert opened.status_code == 201
+    conversation = opened.json()
+    assert "AI sales assistant" in conversation["messages"][-1]["text"]
+
+    response = client.post(
+        f"/api/conversations/{conversation['id']}/messages",
+        json={"text": "STOP"},
+    )
+    assert response.status_code == 200
+    assert response.json()["lead"]["opted_out"] is True
+    assert response.json()["messages"][-1]["role"] == "assistant"
+    assert client.post(
+        f"/api/conversations/{conversation['id']}/messages",
+        json={"text": "What units are available?"},
+    ).status_code == 409
+    assert client.post(
+        "/api/conversations",
+        json={"lead_id": lead["id"], "channel": "voice"},
+    ).status_code == 409
+
+
+def test_conversation_requires_citations_from_registered_rag(client, app):
+    lead = mk_lead(client)
+    prop = mk_prop(
+        client,
+        code="DLL-0001",
+        price=5_000_000,
+        source_name="Approved inventory",
+        source_updated_at="2026-10-18",
+        source_version="v1",
+    )
+    app.state.registry.register(
+        "rag",
+        lambda request: {
+            "answer": "The price is 1 EGP.",
+            "evidence": [
+                {"source": "Unverified document", "text": "price 1 EGP"},
+            ],
+            "sources": ["Unverified document"],
+        },
+    )
+    conversation = client.post(
+        "/api/conversations",
+        json={"lead_id": lead["id"], "channel": "web_chat"},
+    ).json()
+    response = client.post(
+        f"/api/conversations/{conversation['id']}/messages",
+        json={"text": f"What is the price of {prop['code']}?"},
+    )
+    assert response.status_code == 200
+    answer = response.json()["messages"][-1]
+    assert "1 EGP" not in answer["text"]
+    assert "5,000,000 EGP" in answer["text"]
+    assert answer["citations"]
+
+
+def test_inventory_commercial_answer_requires_source_version(client):
+    lead = mk_lead(client)
+    prop = mk_prop(
+        client,
+        code="DLL-0001",
+        price=5_000_000,
+        source_name="Approved inventory",
+        source_updated_at="2026-10-18",
+    )
+    conversation = client.post(
+        "/api/conversations",
+        json={"lead_id": lead["id"], "channel": "web_chat"},
+    ).json()
+    response = client.post(
+        f"/api/conversations/{conversation['id']}/messages",
+        json={"text": f"What is the price of {prop['code']}?"},
+    )
+    answer = response.json()["messages"][-1]
+    assert "will not quote a commercial figure" in answer["text"]
+    assert answer["citations"] == []
+    assert any(h["category"] == "conflicting_commercial_info"
+               for h in client.get("/api/handoffs").json())

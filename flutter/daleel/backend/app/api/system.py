@@ -4,8 +4,17 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from .. import config
-from ..integrations.contracts import MODULES, ModuleNotConfigured
-from ..integrations.contracts import LeadScoringRequest, RagRequest, RecommendationRequest
+from ..integrations.contracts import (
+    MODULES,
+    LlmAgentRequest,
+    LeadScoringRequest,
+    ModuleNotConfigured,
+    OcrRequest,
+    RagRequest,
+    RecommendationRequest,
+    SttRequest,
+    TtsRequest,
+)
 from ..services import dashboard
 from .deps import get_db
 
@@ -23,7 +32,7 @@ HF_POINTS = [
 def _module_info(registry):
     return [{"module": k, "title": v["title"], "description": v["description"], "status": registry.status(k),
              "label": "Integrated" if registry.status(k) == "integrated" else "Not integrated yet",
-             "endpoint": v["route"]} for k, v in MODULES.items()]
+             "endpoint": v["route"], "integration_slot": v["slot"]} for k, v in MODULES.items()]
 
 
 @router.get("/health")
@@ -89,3 +98,23 @@ def score(body: LeadScoringRequest, request: Request):
 @router.post("/integrations/rag/query")
 def rag(body: RagRequest, request: Request):
     return _dispatch(request, "rag", body)
+
+
+@router.post("/integrations/stt/transcribe")
+def transcribe(body: SttRequest, request: Request):
+    return _dispatch(request, "stt", body)
+
+
+@router.post("/integrations/tts/speak")
+def speak(body: TtsRequest, request: Request):
+    return _dispatch(request, "tts", body)
+
+
+@router.post("/integrations/ocr/extract")
+def extract_document(body: OcrRequest, request: Request):
+    return _dispatch(request, "ocr", body)
+
+
+@router.post("/integrations/llm-agent/chat")
+def chat_with_agent(body: LlmAgentRequest, request: Request):
+    return _dispatch(request, "llm_agent", body)

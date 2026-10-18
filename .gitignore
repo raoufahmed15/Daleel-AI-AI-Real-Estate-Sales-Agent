@@ -5,3 +5,4 @@ __pycache__/
 .pytest_cache/
 /backend/.venv/
 /backend/daleel.db
+/flutter/daleel/backend/daleel-local.db

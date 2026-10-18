@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../features/bookings/bookings_screen.dart';
+import '../features/conversations/conversation_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
 import '../features/handoffs/handoffs_screen.dart';
 import '../features/integrations/integrations_screen.dart';
@@ -24,6 +25,7 @@ final _dests = <_Dest>[
       'nav_dashboard', Icons.dashboard_outlined, () => const DashboardScreen()),
   _Dest('nav_leads', Icons.people_outline, () => const LeadsScreen()),
   _Dest('nav_properties', Icons.apartment, () => const PropertiesScreen()),
+  _Dest('nav_conversation', Icons.chat_outlined, () => const ConversationScreen()),
   _Dest('nav_crm', Icons.account_tree_outlined, () => const CrmScreen()),
   _Dest('nav_bookings', Icons.event_available_outlined,
       () => const BookingsScreen()),

@@ -126,6 +126,50 @@ class Crm {
   final String? openHandoffStatus;
 }
 
+class ChatCitation {
+  ChatCitation.fromJson(Map<String, dynamic> json)
+      : source = json['source'] as String,
+        text = json['text'] as String;
+  final String source;
+  final String text;
+}
+
+class ChatMessage {
+  ChatMessage.fromJson(Map<String, dynamic> json)
+      : id = json['id'] as int,
+        role = json['role'] as String,
+        text = json['text'] as String,
+        citations = ((json['citations'] ?? const []) as List)
+            .map((item) => ChatCitation.fromJson(item as Map<String, dynamic>))
+            .toList(),
+        moduleGaps = ((json['module_gaps'] ?? const []) as List).cast<String>(),
+        createdAt = DateTime.parse(json['created_at'] as String);
+
+  final int id;
+  final String role, text;
+  final List<ChatCitation> citations;
+  final List<String> moduleGaps;
+  final DateTime createdAt;
+}
+
+class Conversation {
+  Conversation.fromJson(Map<String, dynamic> json)
+      : id = json['id'] as int,
+        leadId = json['lead_id'] as int,
+        channel = json['channel'] as String,
+        createdAt = DateTime.parse(json['created_at'] as String),
+        messages = (json['messages'] as List)
+            .map((item) => ChatMessage.fromJson(item as Map<String, dynamic>))
+            .toList(),
+        lead = Lead.fromJson(json['lead'] as Map<String, dynamic>);
+
+  final int id, leadId;
+  final String channel;
+  final DateTime createdAt;
+  final List<ChatMessage> messages;
+  final Lead lead;
+}
+
 class PageResult<T> {
   PageResult(this.items, this.total);
   final List<T> items;

@@ -27,6 +27,7 @@ class IntegrationsScreen extends ConsumerWidget {
                 const SizedBox(height: 8),
                 InfoRow(context.tr('endpoint'), m['endpoint'] as String),
                 InfoRow(context.tr('status'), m['status'] as String),
+                InfoRow(context.tr('integration_slot'), m['integration_slot'] as String),
               ]),
             ),
             const SizedBox(height: 12),
