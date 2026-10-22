@@ -1,0 +1,167 @@
+{
+  "data_version": "1.0.0",
+  "documents": [
+    {
+      "doc_id": "EXT-01",
+      "title_ar": "بروشور مشروع دليل",
+      "version": "1.0",
+      "issue_date": "2026-07-01",
+      "valid_until": null,
+      "scope": "external",
+      "file": "external/01_project_brochure.pdf"
+    },
+    {
+      "doc_id": "EXT-02",
+      "title_ar": "مواصفات التشطيب",
+      "version": "1.0",
+      "issue_date": "2026-07-01",
+      "valid_until": null,
+      "scope": "external",
+      "file": "external/02_finishing_specifications.pdf"
+    },
+    {
+      "doc_id": "EXT-03",
+      "title_ar": "الأسئلة الشائعة",
+      "version": "1.0",
+      "issue_date": "2026-07-01",
+      "valid_until": null,
+      "scope": "external",
+      "file": "external/03_faq.pdf"
+    },
+    {
+      "doc_id": "EXT-04",
+      "title_ar": "شروط الحجز والإلغاء والتنازل",
+      "version": "1.0",
+      "issue_date": "2026-07-01",
+      "valid_until": null,
+      "scope": "external",
+      "file": "external/04_booking_cancellation_terms.pdf"
+    },
+    {
+      "doc_id": "EXT-05",
+      "title_ar": "حالة الإنشاء ومواعيد التسليم",
+      "version": "1.2",
+      "issue_date": "2026-10-01",
+      "valid_until": null,
+      "scope": "external",
+      "file": "external/05_construction_delivery_status.pdf"
+    },
+    {
+      "doc_id": "EXT-06",
+      "title_ar": "دليل المنطقة المحيطة",
+      "version": "1.0",
+      "issue_date": "2026-07-01",
+      "valid_until": null,
+      "scope": "external",
+      "file": "external/06_area_guide.pdf"
+    },
+    {
+      "doc_id": "EXT-07",
+      "title_ar": "قائمة الأسعار - الإصدار الأول",
+      "version": "v1",
+      "issue_date": "2026-03-01",
+      "valid_until": "2026-06-30",
+      "scope": "external",
+      "file": "external/07_price_list_v1.pdf"
+    },
+    {
+      "doc_id": "EXT-08",
+      "title_ar": "قائمة الأسعار - الإصدار الثاني",
+      "version": "v2",
+      "issue_date": "2026-07-01",
+      "valid_until": "2026-12-31",
+      "scope": "external",
+      "file": "external/08_price_list_v2.pdf"
+    },
+    {
+      "doc_id": "EXT-09",
+      "title_ar": "ملحق قائمة الأسعار",
+      "version": "v2-ملحق",
+      "issue_date": "2026-08-15",
+      "valid_until": null,
+      "scope": "external",
+      "file": "external/09_price_list_addendum.pdf"
+    },
+    {
+      "doc_id": "EXT-10",
+      "title_ar": "خطط السداد",
+      "version": "2.0",
+      "issue_date": "2026-07-01",
+      "valid_until": "2026-12-31",
+      "scope": "external",
+      "file": "external/10_payment_plans.pdf"
+    },
+    {
+      "doc_id": "EXT-11",
+      "title_ar": "كشف الوحدات المتاحة",
+      "version": "2026-10-01",
+      "issue_date": "2026-10-01",
+      "valid_until": null,
+      "scope": "external",
+      "file": "external/11_availability_sheet.pdf"
+    },
+    {
+      "doc_id": "EXT-12",
+      "title_ar": "الرسوم الإضافية",
+      "version": "1.0",
+      "issue_date": "2026-07-01",
+      "valid_until": null,
+      "scope": "external",
+      "file": "external/12_additional_fees.pdf"
+    },
+    {
+      "doc_id": "EXT-13",
+      "title_ar": "سياسة الخصوصية والتواصل",
+      "version": "1.0",
+      "issue_date": "2026-07-01",
+      "valid_until": null,
+      "scope": "external",
+      "file": "external/13_privacy_communication_policy.pdf"
+    },
+    {
+      "doc_id": "INT-14",
+      "title_ar": "دليل المبيعات",
+      "version": "1.0",
+      "issue_date": "2026-07-01",
+      "valid_until": null,
+      "scope": "internal",
+      "file": "internal/14_sales_playbook.pdf"
+    },
+    {
+      "doc_id": "INT-15",
+      "title_ar": "قواعد الخصومات وصلاحيات الموافقة",
+      "version": "DB-2026-07",
+      "issue_date": "2026-07-01",
+      "valid_until": null,
+      "scope": "internal",
+      "file": "internal/15_discount_policy.pdf"
+    },
+    {
+      "doc_id": "INT-16",
+      "title_ar": "سياسة التحويل لمندوب بشري ومعالجة الشكاوى",
+      "version": "1.0",
+      "issue_date": "2026-07-01",
+      "valid_until": null,
+      "scope": "internal",
+      "file": "internal/16_handoff_complaints_policy.pdf"
+    },
+    {
+      "doc_id": "INT-17",
+      "title_ar": "قواعد المتابعة",
+      "version": "FU-2026-07",
+      "issue_date": "2026-07-01",
+      "valid_until": null,
+      "scope": "internal",
+      "file": "internal/17_follow_up_rules.pdf"
+    },
+    {
+      "doc_id": "INT-18",
+      "title_ar": "معايير تصنيف العملاء ومراحل المبيعات",
+      "version": "HL-2026-07",
+      "issue_date": "2026-07-01",
+      "valid_until": null,
+      "scope": "internal",
+      "file": "internal/18_lead_classification_funnel.pdf"
+    }
+  ]
+}
