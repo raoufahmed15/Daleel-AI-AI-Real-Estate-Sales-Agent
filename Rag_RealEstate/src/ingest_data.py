@@ -183,8 +183,10 @@ def main() -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)
     if args.only != "vectors":
         warns = ingest_inventory()
-        print("✔ inventory جاهز" if not warns else "⚠ تحذيرات التحقق:\n  " + "\n  ".join(warns))
+        print("Inventory ready" if not warns else "Validation warnings:\n  " + "\n  ".join(warns))
     if args.only != "inventory":
+        count = ingest_vectors(reset=not args.no_reset)
+        logging.info("Vector index ready: %d chunks", count)
         from src.retriever import get_client
         get_client().close()        # يسكّر Qdrant صراحة فما يطلع ImportError
 

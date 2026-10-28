@@ -12,6 +12,8 @@ pydantic-settings>=2.2
 python-dotenv
 SQLAlchemy>=2.0
 streamlit>=1.35
+fastapi>=0.110
+uvicorn[standard]>=0.29
 langsmith>=0.2
 pytest>=8
 numpy

@@ -5,11 +5,18 @@ typedef Json = Map<String, dynamic>;
 
 /// All backend calls live here; UI never builds URLs.
 class Repository {
-  Repository(this.api);
+  Repository(this.api, this.ragApi);
   final ApiClient api;
+  final ApiClient ragApi;
 
   PageResult<T> _page<T>(dynamic d, T Function(Json) f) =>
       PageResult((d['items'] as List).map((e) => f(e as Json)).toList(), d['total'] as int);
+
+  Future<RagAnswer> askRag(String query, String sessionId) async =>
+      RagAnswer.fromJson(await ragApi.post('/api/chat', body: {
+        'query': query,
+        'session_id': sessionId,
+      }) as Json);
 
   Future<Json> health() async => await api.get('/api/health') as Json;
   Future<Json> dashboard() async => await api.get('/api/dashboard') as Json;

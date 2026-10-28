@@ -86,7 +86,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                     const SizedBox(height: 12),
                     FilledButton(
                       onPressed: () =>
-                          ref.read(navIndexProvider.notifier).state = 1,
+                          ref.read(navIndexProvider.notifier).state = 2,
                       child: Text(context.tr('new_lead')),
                     ),
                   ],

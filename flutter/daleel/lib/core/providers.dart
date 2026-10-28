@@ -7,10 +7,17 @@ import 'repository.dart';
 
 String defaultBaseUrl() =>
     (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) ? 'http://10.0.2.2:8000' : 'http://localhost:8000';
+String defaultRagBaseUrl() =>
+    (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) ? 'http://10.0.2.2:8100' : 'http://localhost:8100';
 
 final baseUrlProvider = StateProvider<String>((ref) => defaultBaseUrl());
+final ragBaseUrlProvider = StateProvider<String>((ref) => defaultRagBaseUrl());
 final apiProvider = Provider<ApiClient>((ref) => ApiClient(ref.watch(baseUrlProvider)));
-final repoProvider = Provider<Repository>((ref) => Repository(ref.watch(apiProvider)));
+final ragApiProvider = Provider<ApiClient>((ref) => ApiClient(
+      ref.watch(ragBaseUrlProvider),
+      timeout: const Duration(seconds: 150),
+    ));
+final repoProvider = Provider<Repository>((ref) => Repository(ref.watch(apiProvider), ref.watch(ragApiProvider)));
 final localeProvider = StateProvider<Locale>((ref) => const Locale('en'));
 final navIndexProvider = StateProvider<int>((ref) => 0);
 

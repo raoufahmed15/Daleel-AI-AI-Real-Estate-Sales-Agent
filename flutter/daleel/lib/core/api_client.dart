@@ -13,8 +13,9 @@ class ApiException implements Exception {
 
 /// Thin HTTP client. No UI or business logic here.
 class ApiClient {
-  ApiClient(this.baseUrl);
+  ApiClient(this.baseUrl, {this.timeout = const Duration(seconds: 15)});
   final String baseUrl;
+  final Duration timeout;
   final http.Client _client = http.Client();
 
   Uri _uri(String path, Map<String, dynamic>? query) {
@@ -31,7 +32,7 @@ class ApiClient {
     if (body != null) req.body = jsonEncode(body);
     http.Response res;
     try {
-      final streamed = await _client.send(req).timeout(const Duration(seconds: 15));
+      final streamed = await _client.send(req).timeout(timeout);
       res = await http.Response.fromStream(streamed);
     } catch (_) {
       throw ApiException(0, 'network_error', 'Cannot reach the backend at $baseUrl');

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../features/chat/rag_chat_screen.dart';
 import '../features/bookings/bookings_screen.dart';
 import '../features/conversations/conversation_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
@@ -21,11 +22,13 @@ class _Dest {
 }
 
 final _dests = <_Dest>[
+  _Dest('nav_chat', Icons.chat_bubble_outline, () => const RagChatScreen()),
   _Dest(
       'nav_dashboard', Icons.dashboard_outlined, () => const DashboardScreen()),
   _Dest('nav_leads', Icons.people_outline, () => const LeadsScreen()),
   _Dest('nav_properties', Icons.apartment, () => const PropertiesScreen()),
-  _Dest('nav_conversation', Icons.chat_outlined, () => const ConversationScreen()),
+  _Dest('nav_conversation', Icons.chat_outlined,
+      () => const ConversationScreen()),
   _Dest('nav_crm', Icons.account_tree_outlined, () => const CrmScreen()),
   _Dest('nav_bookings', Icons.event_available_outlined,
       () => const BookingsScreen()),
@@ -41,7 +44,7 @@ class AppShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final index = ref.watch(navIndexProvider);
     final size = MediaQuery.of(context).size;
-    final wide = size.width >= 800 && size.height >= 600;
+    final wide = size.width >= 800 && size.height >= 720;
     final body = Padding(
         padding: const EdgeInsets.all(16), child: _dests[index].builder());
     final banner = Material(

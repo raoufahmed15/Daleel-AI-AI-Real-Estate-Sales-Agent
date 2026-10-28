@@ -36,15 +36,24 @@ cp .env.example .env
 # 3) بناء قواعد المعرفة (أول مرة ينزّل bge-m3 ~2.2GB)
 python -m src.ingest_data         # يطبع تحذيرات التحقق إن وُجدت (فارغة = مطابق لملخص كشف التوافر)
 
-# 4) التشغيل
-streamlit run app.py
+# 4) تشغيل الواجهة المطلوبة
+streamlit run app.py                         # واجهة Streamlit
 python -m src.agent "ما هي خطط السداد؟"     # من الطرفية
+# أو شغّل API لربط تطبيق Flutter (على المنفذ 8100)
+uvicorn rag_api:app --host 0.0.0.0 --port 8100
 
 # 5) الاختبار والتقييم
 pytest -q                                          # حتمي، بدون Ollama ولا نماذج
 python -m src.evaluation --categories unit,handoff # حتمي، بدون LLM
 python -m src.evaluation                           # كل الأسئلة (يحتاج Ollama + bge-m3) -> reports/
 ```
+
+يتطلب بناء الفهرس ملفات PDF في `documents/` ونموذج التضمين المحدد في `EMBEDDING_MODEL`. يجب استخدام **نفس النموذج نفسه** أثناء الفهرسة وتشغيل API. عند تغيير النموذج، أعد بناء الفهرس بـ`python -m src.ingest_data` قبل تشغيل الخدمة.
+
+واجهة Flutter ترسل `POST /api/chat` إلى خدمة `rag_api` بجسم
+`{"query": "السؤال", "session_id": "معرّف-الجلسة"}`. تحتفظ الجلسة بسياق الوحدات
+داخل عملية الخدمة، وتُعاد المصادر وحالة التحويل البشري مع كل إجابة. شغّل Streamlit
+أو API حسب الواجهة التي تريد استخدامها.
 
 ## كيف يعمل السؤال
 

@@ -8,7 +8,7 @@ import 'package:daleel_ai/features/conversations/conversation_screen.dart';
 import 'package:daleel_ai/main.dart';
 
 void main() {
-  testWidgets('Daleel dashboard starts successfully',
+  testWidgets('RAG chat is the home page and dashboard remains reachable',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1200, 900);
     tester.view.devicePixelRatio = 1;
@@ -42,6 +42,12 @@ void main() {
 
     expect(find.byType(NavigationRail), findsOneWidget);
     expect(find.text('Daleel AI'), findsOneWidget);
+    expect(
+      find.textContaining('Welcome! I am Daleel’s real-estate assistant.'),
+      findsOneWidget,
+    );
+    await tester.tap(find.byIcon(Icons.dashboard_outlined));
+    await tester.pumpAndSettle();
     expect(find.text('Calculated from stored records'), findsOneWidget);
     expect(find.text('Total leads'), findsOneWidget);
 
@@ -85,7 +91,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('AI Sandbox'));
+    await tester.tap(find.byIcon(Icons.chat_outlined));
     await tester.pumpAndSettle();
 
     expect(find.text('Add a lead first to start a sandbox conversation.'),

@@ -134,6 +134,30 @@ class ChatCitation {
   final String text;
 }
 
+class RagSource {
+  RagSource.fromJson(Map<String, dynamic> json)
+      : docId = json['doc_id'] as String,
+        title = json['title'] as String? ?? '',
+        version = json['version'] as String? ?? '',
+        issueDate = json['issue_date'] as String? ?? '';
+
+  final String docId, title, version, issueDate;
+}
+
+class RagAnswer {
+  RagAnswer.fromJson(Map<String, dynamic> json)
+      : status = json['status'] as String,
+        reply = json['reply'] as String,
+        reason = json['reason'] as String?,
+        sources = ((json['sources'] ?? const []) as List)
+            .map((item) => RagSource.fromJson(item as Map<String, dynamic>))
+            .toList();
+
+  final String status, reply;
+  final String? reason;
+  final List<RagSource> sources;
+}
+
 class ChatMessage {
   ChatMessage.fromJson(Map<String, dynamic> json)
       : id = json['id'] as int,
