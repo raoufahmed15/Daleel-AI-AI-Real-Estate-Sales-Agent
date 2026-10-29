@@ -1,12 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/providers.dart';
 import 'core/shell.dart';
 import 'core/theme.dart';
 
-void main() => runApp(const ProviderScope(child: DaleelApp()));
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final preferences = await SharedPreferences.getInstance();
+  final ragBaseUrl =
+      preferences.getString('rag_base_url') ?? defaultRagBaseUrl();
+
+  runApp(
+    ProviderScope(
+      overrides: [
+        ragBaseUrlProvider.overrideWith((ref) => ragBaseUrl),
+      ],
+      child: const DaleelApp(),
+    ),
+  );
+}
 
 class DaleelApp extends ConsumerWidget {
   const DaleelApp({super.key});

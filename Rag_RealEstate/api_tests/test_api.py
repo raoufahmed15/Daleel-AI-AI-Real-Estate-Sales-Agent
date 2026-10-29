@@ -101,6 +101,43 @@ def test_transcribe_audio_calls_qwen_space(monkeypatch):
     assert asr_client.calls[0]["api_name"] == "/transcribe"
 
 
+def test_asr_client_uses_hugging_face_token(monkeypatch):
+    import gradio_client
+
+    calls = []
+
+    def fake_client(space, *, hf_token, verbose):
+        calls.append((space, hf_token, verbose))
+        return FakeAsrClient()
+
+    monkeypatch.setenv("HF_TOKEN", "hf-test-token")
+    monkeypatch.setattr(gradio_client, "Client", fake_client)
+    rag_api.get_asr_client.cache_clear()
+    try:
+        rag_api.get_asr_client()
+    finally:
+        rag_api.get_asr_client.cache_clear()
+
+    assert calls == [(rag_api.ASR_SPACE, "hf-test-token", False)]
+
+
+def test_transcribe_reports_exhausted_zerogpu_quota(monkeypatch):
+    class QuotaLimitedAsrClient:
+        def predict(self, **kwargs):
+            raise RuntimeError("You have exceeded your ZeroGPU runs limit.")
+
+    monkeypatch.setattr(
+        rag_api, "get_asr_client", lambda: QuotaLimitedAsrClient()
+    )
+    response = TestClient(rag_api.app).post(
+        "/api/transcribe",
+        files={"file": ("voice.wav", BytesIO(wav_sample()), "audio/wav")},
+    )
+
+    assert response.status_code == 503
+    assert "HF_TOKEN" in response.json()["detail"]
+
+
 def test_transcribe_rejects_invalid_wav(monkeypatch):
     monkeypatch.setattr(rag_api, "get_asr_client", lambda: FakeAsrClient())
 

@@ -2,15 +2,18 @@
 from __future__ import annotations
 
 import logging
+import os
 import tempfile
 from functools import lru_cache
 from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 
 log = logging.getLogger(__name__)
+load_dotenv(Path(__file__).resolve().parent / ".env")
 ASR_SPACE = "mohammedaly22/QwenCleo-ASR-Egyptian-Arabic"
 MAX_AUDIO_BYTES = 15 * 1024 * 1024
 
@@ -46,7 +49,7 @@ def get_agent():
 def get_asr_client():
     from gradio_client import Client
 
-    return Client(ASR_SPACE, verbose=False)
+    return Client(ASR_SPACE, hf_token=os.getenv("HF_TOKEN"), verbose=False)
 
 
 @app.get("/api/health")
@@ -98,6 +101,17 @@ def transcribe(file: UploadFile = File(...)) -> dict[str, str]:
         raise
     except Exception as error:
         log.exception("QwenCleo audio transcription failed")
+        error_message = str(error).casefold()
+        if "zerogpu" in error_message and (
+            "limit" in error_message or "quota" in error_message
+        ):
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Hugging Face ZeroGPU quota is exhausted. Configure an "
+                    "HF_TOKEN with available Space quota, then restart the RAG API."
+                ),
+            ) from error
         raise HTTPException(
             status_code=502,
             detail="The Arabic transcription service is unavailable. Please try again.",

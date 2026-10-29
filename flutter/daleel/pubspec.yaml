@@ -15,6 +15,7 @@ dependencies:
   http: ^1.2.0
   intl: any
   record: 7.1.2
+  shared_preferences: ^2.5.6
 
 dev_dependencies:
   flutter_test:

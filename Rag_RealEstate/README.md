@@ -59,6 +59,8 @@ python -m src.evaluation                           # كل الأسئلة (يحت
 الصوت إلى خدمة QwenCleo العامة على Hugging Face وتضع النص الناتج في خانة الرسالة
 ليراجعه المستخدم قبل إرساله إلى المساعد. يتطلب ذلك اتصال إنترنت وحزمتي
 `gradio_client` و`python-multipart` المثبتتين من `requirements.txt`.
+إذا نفدت حصة ZeroGPU العامة، أنشئ Hugging Face access token بصلاحية قراءة،
+وأضفه إلى `.env` المحلي باسم `HF_TOKEN` (ولا ترفعه إلى Git)، ثم أعد تشغيل API.
 
 ## كيف يعمل السؤال
 
