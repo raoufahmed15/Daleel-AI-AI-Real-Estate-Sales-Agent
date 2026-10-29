@@ -1,7 +1,10 @@
+import 'dart:async';
+import 'dart:typed_data';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:record/record.dart';
 
 import '../../core/l10n.dart';
 import '../../core/models.dart';
@@ -32,9 +35,15 @@ class RagChatScreen extends ConsumerStatefulWidget {
 class _RagChatScreenState extends ConsumerState<RagChatScreen> {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
+  final _recorder = AudioRecorder();
+  final _audioBytes = BytesBuilder(copy: false);
   late String _sessionId;
   late List<_ChatEntry> _messages;
+  StreamSubscription<Uint8List>? _audioSubscription;
+  Timer? _recordingLimit;
   bool _busy = false;
+  bool _recording = false;
+  bool _transcribing = false;
 
   String get _greeting {
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
@@ -55,9 +64,141 @@ class _RagChatScreenState extends ConsumerState<RagChatScreen> {
 
   @override
   void dispose() {
+    _recordingLimit?.cancel();
+    unawaited(_audioSubscription?.cancel());
+    unawaited(_recorder.dispose());
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _toggleRecording() async {
+    if (_recording) {
+      await _stopRecording();
+      return;
+    }
+    if (_busy || _transcribing) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(context.tr('voice_privacy_title')),
+        content: Text(context.tr('voice_privacy_notice')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(context.tr('cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(context.tr('voice_continue')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      if (!await _recorder.hasPermission()) {
+        if (mounted) {
+          snack(context, context.tr('microphone_permission_denied'),
+              error: true);
+        }
+        return;
+      }
+      _audioBytes.clear();
+      final stream = await _recorder.startStream(const RecordConfig(
+        encoder: AudioEncoder.pcm16bits,
+        sampleRate: 16000,
+        numChannels: 1,
+        echoCancel: true,
+        noiseSuppress: true,
+      ));
+      _audioSubscription = stream.listen(
+        _audioBytes.add,
+        onError: (Object error, StackTrace stack) {
+          if (mounted) snack(context, error.toString(), error: true);
+        },
+      );
+      if (!mounted) {
+        await _recorder.cancel();
+        return;
+      }
+      setState(() => _recording = true);
+      _recordingLimit = Timer(
+        const Duration(seconds: 45),
+        _stopRecording,
+      );
+    } catch (error) {
+      if (mounted) {
+        snack(context, '${context.tr('recording_failed')}: $error',
+            error: true);
+      }
+    }
+  }
+
+  Future<void> _stopRecording() async {
+    if (!_recording) return;
+    _recordingLimit?.cancel();
+    _recordingLimit = null;
+    if (!mounted) return;
+    final emptyRecordingMessage = context.tr('empty_recording');
+    setState(() {
+      _recording = false;
+      _transcribing = true;
+    });
+
+    try {
+      await _recorder.stop();
+      final audioSubscription = _audioSubscription;
+      _audioSubscription = null;
+      await audioSubscription?.cancel();
+      final pcm = _audioBytes.takeBytes();
+      if (pcm.isEmpty) {
+        throw StateError(emptyRecordingMessage);
+      }
+      final transcript = await ref
+          .read(repoProvider)
+          .transcribeAudio(_wavBytes(pcm, sampleRate: 16000));
+      if (!mounted) return;
+      _messageController.text = transcript;
+      _messageController.selection = TextSelection.collapsed(
+        offset: transcript.length,
+      );
+      snack(context, context.tr('transcription_ready'));
+    } catch (error) {
+      if (mounted) {
+        snack(context, '${context.tr('transcription_failed')}: $error',
+            error: true);
+      }
+    } finally {
+      if (mounted) setState(() => _transcribing = false);
+    }
+  }
+
+  Uint8List _wavBytes(Uint8List pcm, {required int sampleRate}) {
+    final bytes = ByteData(44 + pcm.length);
+    void writeAscii(int offset, String value) {
+      for (var i = 0; i < value.length; i++) {
+        bytes.setUint8(offset + i, value.codeUnitAt(i));
+      }
+    }
+
+    writeAscii(0, 'RIFF');
+    bytes.setUint32(4, 36 + pcm.length, Endian.little);
+    writeAscii(8, 'WAVE');
+    writeAscii(12, 'fmt ');
+    bytes.setUint32(16, 16, Endian.little);
+    bytes.setUint16(20, 1, Endian.little);
+    bytes.setUint16(22, 1, Endian.little);
+    bytes.setUint32(24, sampleRate, Endian.little);
+    bytes.setUint32(28, sampleRate * 2, Endian.little);
+    bytes.setUint16(32, 2, Endian.little);
+    bytes.setUint16(34, 16, Endian.little);
+    writeAscii(36, 'data');
+    bytes.setUint32(40, pcm.length, Endian.little);
+    bytes.buffer.asUint8List().setRange(44, 44 + pcm.length, pcm);
+    return bytes.buffer.asUint8List();
   }
 
   void _startNewChat() {
@@ -166,7 +307,7 @@ class _RagChatScreenState extends ConsumerState<RagChatScreen> {
             Expanded(
               child: TextField(
                 controller: _messageController,
-                enabled: !_busy,
+                enabled: !_busy && !_recording && !_transcribing,
                 minLines: 1,
                 maxLines: 4,
                 textInputAction: TextInputAction.send,
@@ -179,9 +320,28 @@ class _RagChatScreenState extends ConsumerState<RagChatScreen> {
               ),
             ),
             const SizedBox(width: 8),
+            IconButton.filledTonal(
+              tooltip: _recording
+                  ? context.tr('stop_recording')
+                  : context.tr('record_voice'),
+              onPressed: _busy || _transcribing ? null : _toggleRecording,
+              style: _recording
+                  ? IconButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                    )
+                  : null,
+              icon: _transcribing
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(_recording ? Icons.stop : Icons.mic_none),
+            ),
+            const SizedBox(width: 4),
             IconButton.filled(
               tooltip: context.tr('send_message'),
-              onPressed: _busy ? null : _sendMessage,
+              onPressed:
+                  _busy || _recording || _transcribing ? null : _sendMessage,
               icon: const Icon(Icons.send),
             ),
           ],

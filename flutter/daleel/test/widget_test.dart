@@ -46,6 +46,16 @@ void main() {
       find.textContaining('Welcome! I am Daleel’s real-estate assistant.'),
       findsOneWidget,
     );
+    expect(find.byIcon(Icons.mic_none), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.mic_none));
+    await tester.pumpAndSettle();
+    expect(find.text('Voice transcription privacy'), findsOneWidget);
+    expect(
+      find.textContaining('QwenCleo Arabic speech-recognition model'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.dashboard_outlined));
     await tester.pumpAndSettle();
     expect(find.text('Calculated from stored records'), findsOneWidget);

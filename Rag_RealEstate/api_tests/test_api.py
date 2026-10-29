@@ -1,3 +1,5 @@
+from io import BytesIO
+import struct
 from fastapi.testclient import TestClient
 
 import rag_api
@@ -20,6 +22,33 @@ class FakeResult:
             "reason": None,
             "sources": [{"doc_id": "FAQ-01", "title": "الأسئلة الشائعة", "version": "v1", "issue_date": ""}],
         }
+
+
+class FakeAsrClient:
+    def __init__(self):
+        self.calls = []
+
+    def predict(self, **kwargs):
+        self.calls.append(kwargs)
+        assert kwargs["audio_path"]
+        with open(kwargs["audio_path"]["path"], "rb") as audio_file:
+            header = audio_file.read(12)
+            assert header[:4] == b"RIFF"
+            assert header[8:12] == b"WAVE"
+        return "عايز شقة في القاهرة الجديدة"
+
+
+def wav_sample():
+    pcm = b"\x00\x00" * 8
+    return (
+        b"RIFF"
+        + struct.pack("<I", 36 + len(pcm))
+        + b"WAVEfmt "
+        + struct.pack("<IHHIIHH", 16, 1, 1, 16000, 32000, 2, 16)
+        + b"data"
+        + struct.pack("<I", len(pcm))
+        + pcm
+    )
 
 
 def test_health():
@@ -54,3 +83,39 @@ def test_chat_rejects_blank_query():
     )
 
     assert response.status_code == 422
+
+
+def test_transcribe_audio_calls_qwen_space(monkeypatch):
+    asr_client = FakeAsrClient()
+    monkeypatch.setattr(rag_api, "get_asr_client", lambda: asr_client)
+
+    response = TestClient(rag_api.app).post(
+        "/api/transcribe",
+        files={"file": ("voice.wav", BytesIO(wav_sample()), "audio/wav")},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"transcript": "عايز شقة في القاهرة الجديدة"}
+    assert asr_client.calls[0]["language"] == "Arabic"
+    assert asr_client.calls[0]["do_normalize"] is False
+    assert asr_client.calls[0]["api_name"] == "/transcribe"
+
+
+def test_transcribe_rejects_invalid_wav(monkeypatch):
+    monkeypatch.setattr(rag_api, "get_asr_client", lambda: FakeAsrClient())
+
+    response = TestClient(rag_api.app).post(
+        "/api/transcribe",
+        files={"file": ("voice.wav", BytesIO(b"not audio" * 10), "audio/wav")},
+    )
+
+    assert response.status_code == 400
+
+
+def test_transcribe_rejects_non_wav():
+    response = TestClient(rag_api.app).post(
+        "/api/transcribe",
+        files={"file": ("voice.mp3", BytesIO(b"audio" * 30), "audio/mpeg")},
+    )
+
+    assert response.status_code == 415
