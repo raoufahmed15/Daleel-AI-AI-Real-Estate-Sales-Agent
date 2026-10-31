@@ -1,117 +1,39 @@
-Find files matching `Rag_RealEstate/{.env.example,requirements.txt,rag_api.py,README.md,src/config...`
+تمام، بما إن المشروع متشغّل عندك قبل كده، **مش محتاج تنزّل موديل أو تثبّت الحزم من جديد**. افتح 3 نوافذ PowerShell، وشغّل الأوامر التالية — وسيب كل نافذة مفتوحة.
 
-Find files matching `flutter/daleel/{README*,pubspec.yaml,backend/**/README*}`
+### 1) شغّل Ollama
 
-Search for `uvicorn|streamlit run|ollama|/api/chat|8100|Rag_RealEstate|backend`
-
-Read , lines 1 to 180
-Completed with input: {
-  "path": "D:\\GIT_HUB\\Daleel-AI-AI-Real-Estate-Sales-Agent\\README.md",
-  "view_range": [
-    1,
-    180
-  ]
-}
-
-Read 
-Completed with input: {
-  "path": "D:\\GIT_HUB\\Daleel-AI-AI-Real-Estate-Sales-Agent\\Rag_RealEstate\\.env.example"
-}
-
-Read , lines 1 to 180
-Completed with input: {
-  "path": "D:\\GIT_HUB\\Daleel-AI-AI-Real-Estate-Sales-Agent\\Rag_RealEstate\\src\\config.py",
-  "view_range": [
-    1,
-    180
-  ]
-}
-
-Read , lines 1 to 180
-Completed with input: {
-  "path": "D:\\GIT_HUB\\Daleel-AI-AI-Real-Estate-Sales-Agent\\flutter\\daleel\\README.md",
-  "view_range": [
-    1,
-    180
-  ]
-}
-
-Read 
-Completed with input: {
-  "path": "D:\\GIT_HUB\\Daleel-AI-AI-Real-Estate-Sales-Agent\\Rag_RealEstate\\requirements.txt"
-}
-
-تمام. عندك **3 أجزاء منفصلة** لازم تشغلها: Backend للـCRM، وRAG للمحادثة والبحث، وتطبيق Flutter. كمان Ollama لازم يكون شغال عشان يردّ النموذج المحلي.
-
-## 1) جهّز Ollama — مرة واحدة
-
-ثبّت Ollama وافتحه، ثم في PowerShell نفّذ:
+افتح تطبيق **Ollama**. في نافذة PowerShell تأكد من اسم الموديل الموجود عندك:
 
 ```powershell
-ollama pull qwen3:8b
 ollama list
+ollama pull
 ```
 
-إذا Ollama مش شغال، افتح تطبيق **Ollama**. لا تشغّل `ollama serve` إذا كان التطبيق شغال بالفعل.
+ده بيعرض الموديلات الموجودة، **ما بينزّلش حاجة**. لو اسم موديلك مش `qwen3:4b`، عدّل قيمة `LLM_MODEL` في `ملف .env` لتطابق الاسم الظاهر عندك.
 
-## 2) شغّل Backend الـCRM — نافذة PowerShell أولى
-
-من مجلد المشروع:
+### 2) نافذة PowerShell ثانية: Backend الـCRM
 
 ```powershell
 cd D:\GIT_HUB\Daleel-AI-AI-Real-Estate-Sales-Agent\flutter\daleel\backend
-python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
 python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-اترك النافذة مفتوحة. للتأكد، افتح [توثيق الـBackend](http://127.0.0.1:8000/docs).
-
-## 3) جهّز وشغّل RAG — نافذة PowerShell ثانية
+### 3) نافذة PowerShell ثالثة: خدمة RAG
 
 ```powershell
 cd D:\GIT_HUB\Daleel-AI-AI-Real-Estate-Sales-Agent\Rag_RealEstate
-python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
-if (-not (Test-Path .env)) { Copy-Item .env.example .env }
-```
-
-افتح ملف `.env` وتأكد أن إعداد Ollama موجود:
-
-```env
-OLLAMA_BASE_URL=http://localhost:11434
-LLM_MODEL=qwen3:4b
-```
-
-**أول مرة فقط**، إذا ملفات الـPDF موجودة في `Rag_RealEstate\documents`، ابنِ فهرس المعرفة:
-
-```powershell
-python -m src.ingest_data
-```
-
-بعدها شغّل خدمة RAG واترك النافذة مفتوحة:
-
-```powershell
 python -m uvicorn rag_api:app --reload --host 0.0.0.0 --port 8100
 ```
 
-هذه هي الخدمة التي يرسل لها التطبيق أسئلة المحادثة. توثيق تعليمات RAG موجود في `README الخاص بـRag_RealEstate`.
+ما تشغّلش `ollama pull` أو `pip install` أو `python -m src.ingest_data` الآن؛ دي خطوات إعداد أول مرة، وبيانات RAG موجودة عندك بالفعل.
 
-## 4) شغّل تطبيق Flutter — نافذة PowerShell ثالثة
+### 4) نافذة PowerShell رابعة: افتح التطبيق
 
 ```powershell
 cd D:\GIT_HUB\Daleel-AI-AI-Real-Estate-Sales-Agent\flutter\daleel
-flutter pub get
 flutter run -d chrome
 ```
 
-## الترتيب كل مرة تفتح فيها المشروع
-
-1. افتح Ollama.
-2. شغّل Backend الـCRM على المنفذ `8000`.
-3. شغّل RAG على المنفذ `8100`.
-4. شغّل Flutter.
-
-**ملاحظة:** `HF_TOKEN` اختياري لتحويل الصوت إلى نص فقط؛ المحادثة النصية تستخدم Ollama ولا تحتاج هذا التوكن. لا تشارك التوكن أو ترفعه إلى Git.
+لو ظهر خطأ إن الاعتماديات ناقصة، ساعتها فقط شغّل `flutter pub get` من مجلد Flutter. عناوين الخدمات: Backend على `8000` وRAG على `8100`.
