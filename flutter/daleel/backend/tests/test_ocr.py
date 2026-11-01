@@ -14,7 +14,11 @@ class FakeOcrEngine:
     def ocr(self, image, *, cls):
         assert image.shape == (1, 1, 3)
         assert cls is True
-        return [[[None, ("سعر الوحدة", 0.96)], [None, ("٥ مليون", 0.91)]]]
+        return [[
+            [None, ("رعس ةدحولا", 0.9)],
+            [None, ("Unit price", 0.9)],
+            [None, ("٥ نويلم", 0.9)],
+        ]]
 
 
 def test_ocr_upload_extracts_text(client, monkeypatch):
@@ -29,13 +33,32 @@ def test_ocr_upload_extracts_text(client, monkeypatch):
     assert response.status_code == 200
     assert response.json() == {
         "status": "integrated",
-        "text": "سعر الوحدة\n٥ مليون",
+        "text": "سعر الوحدة\nUnit price\n٥ مليون",
         "fields": {},
-        "confidence": 0.935,
+        "confidence": 0.9,
     }
     ocr_module = next(module for module in client.get("/api/integrations").json()["modules"]
                       if module["module"] == "ocr")
     assert ocr_module["status"] == "integrated"
+
+
+def test_ocr_upload_corrects_arabic_and_preserves_latin_and_digits(client, monkeypatch):
+    class ReversedArabicOcrEngine:
+        def ocr(self, image, *, cls):
+            return [[
+                [None, ("كتقش ةيلاثملا Unit 45 2م", 0.9)],
+            ]]
+
+    monkeypatch.setattr(ocr, "_ocr_engine", lambda: ReversedArabicOcrEngine())
+
+    response = client.post(
+        "/api/integrations/ocr/extract",
+        data={"content_type": "image/png"},
+        files={"file": ("brochure.png", PNG_BYTES, "application/octet-stream")},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["text"] == "شقتك المثالية Unit 45 م2"
 
 
 def test_ocr_upload_reports_unconfigured_model(client, app):

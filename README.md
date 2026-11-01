@@ -36,7 +36,7 @@ python -m uvicorn rag_api:app --reload --host 0.0.0.0 --port 8100
 
 The Flutter app defaults to `http://localhost:8100` for web/desktop and `http://10.0.2.2:8100` for the Android emulator. Change the RAG service URL in Settings if needed. The service uses the RAG project's local Ollama model and vector database; it does not call an external AI provider by default.
 
-The chat's microphone button records a short voice question and sends it to the public QwenCleo Arabic transcription model on Hugging Face. The app asks for confirmation before recording; the transcript is shown for review before it is sent as a chat message. The image button uploads a JPEG, PNG, or WebP file (up to 10 MB) to the local backend and extracts Arabic text with PaddleOCR. The image is not persisted by the application. PaddleOCR downloads its Arabic model files the first time OCR is used, so the backend needs internet access for that initial request.
+The chat's microphone button records a short voice question and sends it to the public QwenCleo Arabic transcription model on Hugging Face. The app asks for confirmation before recording; the transcript is shown for review before it is sent as a chat message. The image button uploads a JPEG, PNG, or WebP file (up to 10 MB) to the local backend and extracts Arabic text with PaddleOCR, correcting reversed Arabic character order while preserving Latin text and digits. The image is not persisted by the application. PaddleOCR downloads its Arabic model files the first time OCR is used, so the backend needs internet access for that initial request.
 
 ### 3. Start the Flutter app
 

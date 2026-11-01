@@ -157,10 +157,10 @@ MODULES = {
     },
     "ocr": {
         "title": "OCR (brochures / price lists)",
-        "description": "Local Arabic OCR for uploaded brochure and price-list images. Output still needs human source verification.",
+        "description": "Local Arabic and English OCR for uploaded brochure and price-list images. Output still needs human source verification.",
         "request": OcrRequest, "response": OcrResponse,
         "route": "/api/integrations/ocr/extract",
-        "slot": "Uses the local PaddleOCR Arabic model. Extracted prices are not published until a sourced inventory row exists.",
+        "slot": "Uses PaddleOCR's multilingual Arabic model with Arabic and Latin characters. Extracted prices are not published until a sourced inventory row exists.",
     },
     "llm_agent": {
         "title": "LLM sales agent",

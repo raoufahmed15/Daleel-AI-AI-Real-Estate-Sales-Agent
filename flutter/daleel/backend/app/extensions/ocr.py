@@ -1,8 +1,9 @@
-"""Local Arabic image OCR using PaddleOCR."""
+"""Local Arabic and English image OCR using PaddleOCR's multilingual Arabic model."""
 from __future__ import annotations
 
 import io
 import logging
+import unicodedata
 from functools import lru_cache
 
 from fastapi import HTTPException
@@ -18,6 +19,49 @@ IMAGE_FORMATS = {
 }
 
 
+def _reverse_arabic_words(text: str) -> str:
+    output = []
+    run = []
+
+    def flush_run() -> None:
+        if run:
+            has_arabic_letter = any(
+                character.isalpha()
+                and unicodedata.name(character, "").startswith("ARABIC ")
+                for character in run
+            )
+            if not has_arabic_letter:
+                output.extend(run)
+                run.clear()
+                return
+
+            clusters = []
+            for character in run:
+                if unicodedata.combining(character) and clusters:
+                    clusters[-1] += character
+                elif character.isdecimal() and clusters and clusters[-1].isdecimal():
+                    clusters[-1] += character
+                else:
+                    clusters.append(character)
+            output.extend(reversed(clusters))
+            run.clear()
+
+    for character in text:
+        is_arabic_letter = (
+            character.isalpha()
+            and unicodedata.name(character, "").startswith("ARABIC ")
+        )
+        if is_arabic_letter or character.isdecimal() or (
+            run and unicodedata.combining(character)
+        ):
+            run.append(character)
+        else:
+            flush_run()
+            output.append(character)
+    flush_run()
+    return "".join(output)
+
+
 @lru_cache(maxsize=1)
 def _ocr_engine():
     try:
@@ -31,9 +75,10 @@ def _ocr_engine():
     try:
         return PaddleOCR(use_angle_cls=True, lang="ar", show_log=False)
     except Exception as error:
-        log.exception("Could not initialize the Arabic PaddleOCR model")
+        log.exception("Could not initialize the Arabic and English PaddleOCR model")
         raise ModuleNotConfigured(
-            "The Arabic PaddleOCR model could not be initialized. Check the backend logs and model download access."
+            "The Arabic and English PaddleOCR model could not be initialized. "
+            "Check the backend logs and model download access."
         ) from error
 
 
@@ -92,7 +137,7 @@ def extract_image_text(request: OcrRequest) -> dict:
                 continue
             text, confidence = line[1]
             if isinstance(text, str) and text.strip():
-                recognized_lines.append(text.strip())
+                recognized_lines.append(_reverse_arabic_words(text.strip()))
                 if isinstance(confidence, (int, float)):
                     confidences.append(float(confidence))
 
