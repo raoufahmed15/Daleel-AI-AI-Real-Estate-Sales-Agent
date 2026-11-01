@@ -93,7 +93,8 @@ class TtsResponse(BaseModel):
 
 class OcrRequest(BaseModel):
     document_name: str = Field(..., min_length=1, max_length=260)
-    document_ref: str | None = Field(None, max_length=500)
+    image_bytes: bytes = Field(..., min_length=1, max_length=10 * 1024 * 1024)
+    content_type: Literal["image/jpeg", "image/png", "image/webp"]
 
 
 class OcrResponse(BaseModel):
@@ -156,10 +157,10 @@ MODULES = {
     },
     "ocr": {
         "title": "OCR (brochures / price lists)",
-        "description": "Local OCR for trial brochure and price-list files. Output still needs human source verification.",
+        "description": "Local Arabic OCR for uploaded brochure and price-list images. Output still needs human source verification.",
         "request": OcrRequest, "response": OcrResponse,
         "route": "/api/integrations/ocr/extract",
-        "slot": "Drop your OCR model here. Extracted prices are not published until a sourced inventory row exists.",
+        "slot": "Uses the local PaddleOCR Arabic model. Extracted prices are not published until a sourced inventory row exists.",
     },
     "llm_agent": {
         "title": "LLM sales agent",

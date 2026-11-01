@@ -30,6 +30,20 @@ class Repository {
     return response['transcript'] as String;
   }
 
+  Future<String> extractImageText(
+    Uint8List image,
+    String filename, {
+    required String contentType,
+  }) async {
+    final response = await api.postMultipart(
+      '/api/integrations/ocr/extract',
+      bytes: image,
+      filename: filename,
+      fields: {'content_type': contentType},
+    ) as Json;
+    return response['text'] as String;
+  }
+
   Future<Json> health() async => await api.get('/api/health') as Json;
   Future<Json> dashboard() async => await api.get('/api/dashboard') as Json;
   Future<Json> integrations() async =>

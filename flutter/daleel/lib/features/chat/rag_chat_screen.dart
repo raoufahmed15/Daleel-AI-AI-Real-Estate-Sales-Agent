@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'dart:math';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:record/record.dart';
@@ -17,12 +18,14 @@ class _ChatEntry {
     required this.text,
     this.sources = const [],
     this.handoffReason,
+    this.title,
   });
 
   final bool isUser;
   final String text;
   final List<RagSource> sources;
   final String? handoffReason;
+  final String? title;
 }
 
 class RagChatScreen extends ConsumerStatefulWidget {
@@ -44,6 +47,7 @@ class _RagChatScreenState extends ConsumerState<RagChatScreen> {
   bool _busy = false;
   bool _recording = false;
   bool _transcribing = false;
+  bool _extractingImage = false;
 
   String get _greeting {
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
@@ -176,6 +180,95 @@ class _RagChatScreenState extends ConsumerState<RagChatScreen> {
     }
   }
 
+  Future<void> _pickImageAndExtractText() async {
+    if (_busy || _recording || _transcribing || _extractingImage) return;
+
+    final imageReadFailed = context.tr('image_read_failed');
+    final imageTooLarge = context.tr('image_too_large');
+    final unsupportedImage = context.tr('unsupported_image');
+    try {
+      final selection = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
+        withData: false,
+        withReadStream: true,
+      );
+      if (selection == null || !mounted) return;
+
+      setState(() => _extractingImage = true);
+      final file = selection.files.single;
+      const maxImageBytes = 10 * 1024 * 1024;
+      if (file.size > maxImageBytes) {
+        throw StateError(imageTooLarge);
+      }
+
+      final imageBuilder = BytesBuilder(copy: false);
+      var imageSize = 0;
+      final imageStream = file.readStream;
+      final imageBytes = file.bytes;
+      if (imageStream != null) {
+        await for (final chunk in imageStream) {
+          imageSize += chunk.length;
+          if (imageSize > maxImageBytes) {
+            throw StateError(imageTooLarge);
+          }
+          imageBuilder.add(chunk);
+        }
+      } else if (imageBytes != null) {
+        imageSize = imageBytes.length;
+        if (imageSize > maxImageBytes) {
+          throw StateError(imageTooLarge);
+        }
+        imageBuilder.add(imageBytes);
+      } else {
+        throw StateError(imageReadFailed);
+      }
+      final image = imageBuilder.takeBytes();
+      if (image.isEmpty) throw StateError(imageReadFailed);
+
+      final contentType = switch (file.extension?.toLowerCase()) {
+        'jpg' || 'jpeg' => 'image/jpeg',
+        'png' => 'image/png',
+        'webp' => 'image/webp',
+        _ => throw StateError(unsupportedImage),
+      };
+
+      final text = await ref.read(repoProvider).extractImageText(
+            image,
+            file.name,
+            contentType: contentType,
+          );
+      if (!mounted) return;
+      final extractedText = text.trim();
+      if (extractedText.isEmpty) {
+        snack(context, context.tr('ocr_no_text'), error: true);
+        return;
+      }
+
+      setState(() {
+        _messages = [
+          ..._messages,
+          _ChatEntry(
+            isUser: false,
+            text: extractedText,
+            title: context.tr('ocr_result'),
+          ),
+        ];
+        _messageController
+          ..text = extractedText
+          ..selection = TextSelection.collapsed(offset: extractedText.length);
+      });
+      _scrollToBottom();
+      snack(context, context.tr('ocr_ready'));
+    } catch (error) {
+      if (mounted) {
+        snack(context, '${context.tr('ocr_failed')}: $error', error: true);
+      }
+    } finally {
+      if (mounted) setState(() => _extractingImage = false);
+    }
+  }
+
   Uint8List _wavBytes(Uint8List pcm, {required int sampleRate}) {
     final bytes = ByteData(44 + pcm.length);
     void writeAscii(int offset, String value) {
@@ -202,7 +295,7 @@ class _RagChatScreenState extends ConsumerState<RagChatScreen> {
   }
 
   void _startNewChat() {
-    if (_busy) return;
+    if (_busy || _recording || _transcribing || _extractingImage) return;
     setState(() {
       _sessionId = _newSessionId();
       _messages = [];
@@ -223,7 +316,13 @@ class _RagChatScreenState extends ConsumerState<RagChatScreen> {
 
   Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
-    if (text.isEmpty || _busy) return;
+    if (text.isEmpty ||
+        _busy ||
+        _recording ||
+        _transcribing ||
+        _extractingImage) {
+      return;
+    }
 
     _messageController.clear();
     setState(() {
@@ -269,7 +368,10 @@ class _RagChatScreenState extends ConsumerState<RagChatScreen> {
             Expanded(child: PageHeader(context.tr('nav_chat'))),
             IconButton(
               tooltip: context.tr('new_chat'),
-              onPressed: _busy ? null : _startNewChat,
+              onPressed:
+                  _busy || _recording || _transcribing || _extractingImage
+                      ? null
+                      : _startNewChat,
               icon: const Icon(Icons.add_comment_outlined),
             ),
           ],
@@ -307,7 +409,10 @@ class _RagChatScreenState extends ConsumerState<RagChatScreen> {
             Expanded(
               child: TextField(
                 controller: _messageController,
-                enabled: !_busy && !_recording && !_transcribing,
+                enabled: !_busy &&
+                    !_recording &&
+                    !_transcribing &&
+                    !_extractingImage,
                 minLines: 1,
                 maxLines: 4,
                 textInputAction: TextInputAction.send,
@@ -321,10 +426,26 @@ class _RagChatScreenState extends ConsumerState<RagChatScreen> {
             ),
             const SizedBox(width: 8),
             IconButton.filledTonal(
+              tooltip: context.tr('upload_image'),
+              onPressed:
+                  _busy || _recording || _transcribing || _extractingImage
+                      ? null
+                      : _pickImageAndExtractText,
+              icon: _extractingImage
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.image_search_outlined),
+            ),
+            const SizedBox(width: 4),
+            IconButton.filledTonal(
               tooltip: _recording
                   ? context.tr('stop_recording')
                   : context.tr('record_voice'),
-              onPressed: _busy || _transcribing ? null : _toggleRecording,
+              onPressed: _busy || _transcribing || _extractingImage
+                  ? null
+                  : _toggleRecording,
               style: _recording
                   ? IconButton.styleFrom(
                       foregroundColor: Theme.of(context).colorScheme.error,
@@ -341,7 +462,9 @@ class _RagChatScreenState extends ConsumerState<RagChatScreen> {
             IconButton.filled(
               tooltip: context.tr('send_message'),
               onPressed:
-                  _busy || _recording || _transcribing ? null : _sendMessage,
+                  _busy || _recording || _transcribing || _extractingImage
+                      ? null
+                      : _sendMessage,
               icon: const Icon(Icons.send),
             ),
           ],
@@ -374,6 +497,13 @@ class _MessageBubble extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (entry.title != null) ...[
+                  Text(
+                    entry.title!,
+                    style: Theme.of(context).textTheme.labelMedium,
+                  ),
+                  const SizedBox(height: 6),
+                ],
                 SelectableText(entry.text),
                 if (entry.handoffReason != null) ...[
                   const SizedBox(height: 8),

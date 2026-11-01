@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -25,7 +25,6 @@ HF_POINTS = [
     {"name": "QualificationProvider", "status": "reserved", "note": "Future conversational qualification extraction."},
     {"name": "SpeechToTextProvider", "status": "reserved", "note": "Future voice input."},
     {"name": "TextToSpeechProvider", "status": "reserved", "note": "Future voice output."},
-    {"name": "OCRProvider", "status": "reserved", "note": "Future document OCR."},
 ]
 
 
@@ -111,7 +110,36 @@ def speak(body: TtsRequest, request: Request):
 
 
 @router.post("/integrations/ocr/extract")
-def extract_document(body: OcrRequest, request: Request):
+def extract_document(
+    request: Request,
+    file: UploadFile = File(...),
+    content_type: str = Form(...),
+):
+    supported_types = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp",
+    }
+    file_name = (file.filename or "").replace("\\", "/").rsplit("/", 1)[-1]
+    if not file_name or len(file_name) > 260:
+        raise HTTPException(status_code=400, detail="Provide an image with a valid file name.")
+    suffix = f".{file_name.rsplit('.', 1)[-1].lower()}" if "." in file_name else ""
+    expected_type = supported_types.get(suffix)
+    if expected_type is None or content_type != expected_type:
+        raise HTTPException(status_code=415, detail="Upload a JPEG, PNG, or WebP image.")
+
+    image_bytes = file.file.read(10 * 1024 * 1024 + 1)
+    if len(image_bytes) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="The image exceeds the 10 MB limit.")
+    if not image_bytes:
+        raise HTTPException(status_code=400, detail="The uploaded image is empty.")
+
+    body = OcrRequest(
+        document_name=file_name,
+        image_bytes=image_bytes,
+        content_type=content_type,
+    )
     return _dispatch(request, "ocr", body)
 
 

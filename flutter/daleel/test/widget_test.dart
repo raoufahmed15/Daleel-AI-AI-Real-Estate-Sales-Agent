@@ -47,6 +47,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.byIcon(Icons.mic_none), findsOneWidget);
+    expect(find.byTooltip('Upload an image and extract its text'), findsOneWidget);
     await tester.tap(find.byIcon(Icons.mic_none));
     await tester.pumpAndSettle();
     expect(find.text('Voice transcription privacy'), findsOneWidget);

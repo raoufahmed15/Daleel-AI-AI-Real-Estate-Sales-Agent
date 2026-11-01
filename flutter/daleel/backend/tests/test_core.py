@@ -315,15 +315,24 @@ def test_excluded_modules_report_not_integrated(client):
     assert {m["module"] for m in mods} == {
         "recommendation_engine", "lead_scoring", "rag", "stt", "tts", "ocr", "llm_agent"
     }
-    assert all(m["status"] == "not_implemented" and m["label"] == "Not integrated yet"
-               and m["integration_slot"] for m in mods)
+    assert all(
+        m["status"] == "integrated" and m["label"] == "Integrated"
+        for m in mods
+        if m["module"] == "ocr"
+    )
+    assert all(
+        m["status"] == "not_implemented"
+        and m["label"] == "Not integrated yet"
+        and m["integration_slot"]
+        for m in mods
+        if m["module"] != "ocr"
+    )
     for url, body in (
         ("recommendation-engine/query", {"budget": 1}),
         ("lead-scoring/score", {"lead_id": 1}),
         ("rag/query", {"question": "What is the delivery date?"}),
         ("stt/transcribe", {"audio_ref": "local://clip.wav"}),
         ("tts/speak", {"text": "Test reply"}),
-        ("ocr/extract", {"document_name": "brochure.pdf", "document_ref": "local://brochure.pdf"}),
         ("llm-agent/chat", {"messages": [{"role": "user", "text": "Hello"}]}),
     ):
         r = client.post(f"/api/integrations/{url}", json=body)
@@ -367,8 +376,6 @@ def test_registry_contract_when_module_is_registered(app, client):
 
 
 def test_registered_modules_validate_responses(client, app):
-    from app.integrations.contracts import ModuleNotConfigured
-
     app.state.registry.register(
         "stt",
         lambda request: {"transcript": "sample transcript", "confidence": 0.9},
@@ -380,17 +387,6 @@ def test_registered_modules_validate_responses(client, app):
         "transcript": "sample transcript",
         "confidence": 0.9,
     }
-
-    app.state.registry.register("ocr", lambda request: (_ for _ in ()).throw(
-        ModuleNotConfigured("OCR model path is not configured")
-    ))
-    response = client.post(
-        "/api/integrations/ocr/extract",
-        json={"document_name": "brochure.pdf"},
-    )
-    assert response.status_code == 503
-    assert response.json()["status"] == "not_configured"
-
 
 def test_conversation_sandbox_records_opt_out_and_blocks_later_chat(client):
     lead = mk_lead(client)
