@@ -14,6 +14,7 @@ from src.models import HandoffReason
 
 
 class Intent(str, Enum):
+    GREETING = "greeting"          # تحية أو سؤال عام بسيط لا علاقة له بالعقارات
     OPT_OUT = "opt_out"
     DELETE_DATA = "delete_data"
     LEGAL = "legal"
@@ -100,6 +101,34 @@ HUMAN = _rx(
 UNIT_RX = re.compile(r"(?<![a-z])([a-z])\s*-?\s*(\d{3})(?!\d)")
 PLAN_WORDS = _rx(r"قسط|اقساط|مقدم|خطه|خطط|سداد|تقسيط|كاش|دفعه")
 
+# ---- التحيات والأسئلة العامة البسيطة (عربي + إنجليزي) ----
+# هذا النمط يمسك الرسائل الخالصة من السياق العقاري فقط.
+# قاعدة: نمط التحية يُفحص أولاً ثم نغادر مباشرة بـ Intent.GREETING.
+GREETING_WORDS_EN = frozenset({
+    "hi", "hello", "hey", "howdy", "greetings", "good morning",
+    "good afternoon", "good evening", "good night", "good day",
+    "sup", "what's up", "whats up", "hiya", "yo",
+    "how are you", "how r u", "how are u", "how do you do",
+    "nice to meet you", "pleased to meet you",
+    "thanks", "thank you", "thank u", "thx", "ty",
+    "ok", "okay", "cool", "great", "awesome", "perfect",
+    "bye", "goodbye", "see you", "see ya", "later", "take care",
+    "help", "start",
+})
+# تحيات عربية — نُطابق على النص المُطَبَّع (bare) بعد normalize()
+# الكلمات مكتوبة بعد التطبيع (أ→ا، ة→ه، ى→ي، تشكيل محذوف)
+_GREETING_AR = re.compile(
+    r"^(مرحبا|مرحب|اهلا|اهلا وسهلا|اهلين|هلا|هلو"
+    r"|السلام عليكم|وعليكم السلام"
+    r"|صباح الخير|صباح النور|صباح الجمال|مساء الخير|مساء النور|مساء الجمال"
+    r"|تصبح علي خير|تصبحوا علي خير"
+    r"|سلام|سلامات|حياك|حياكم|ازيك|ازيكم|عامل ايه|عامله ايه"
+    r"|كيف حالك|كيف الحال|كيف حالكم|شو اخبارك|ما اخبارك|اخبارك ايه"
+    r"|شكرا|شكرا جزيلا|مشكور|ممنون|تسلم|تسلمي|يسلموا|اوكي|اوك|تمام|حسنا|ماشي"
+    r"|مع السلامه|وداعا|باي|في امان الله)$"
+)
+
+
 
 FOLLOWUP_UNIT = _rx(
     r"(هذه|هاي|هادي|هذي|نفس|تلك)\s*(ال)?وحده",
@@ -122,9 +151,30 @@ def asks_plan(text: str) -> bool:
 
 
 
+def _is_greeting(bare: str, original: str) -> bool:
+    """True لو الرسالة تحية أو سؤال اجتماعي بسيط لا علاقة له بالعقارات."""
+    # 1) كلمة إنجليزية واحدة أو عبارة قصيرة من القائمة البيضاء
+    if original.strip().lower() in GREETING_WORDS_EN:
+        return True
+    # 2) عبارات متعددة كلمات (مثل "hey how are you", "hello there")
+    if len(bare.split()) <= 5 and any(
+        original.strip().lower().startswith(w) for w in GREETING_WORDS_EN if len(w) >= 2
+    ):
+        return True
+    # 3) regex العربي على النص المُطَبَّع
+    if _GREETING_AR.search(bare):
+        return True
+    return False
+
+
 def route(text: str) -> Route:
     t = normalize(text)
     bare = re.sub(r"[^\w\s]", "", t).strip()
+
+    # ── التحية: أولاً وقبل كل شيء ──────────────────────────────────────
+    if _is_greeting(bare, text):
+        return Route(Intent.GREETING)
+
     if bare in OPT_OUT_WORDS or OPT_OUT.search(t):
         return Route(Intent.OPT_OUT)
     if DELETE_DATA.search(t):

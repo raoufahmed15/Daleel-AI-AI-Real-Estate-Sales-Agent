@@ -19,10 +19,14 @@ Rules (follow strictly):
 4. You may state published payment-plan discounts. Never negotiate, never offer or promise any extra discount, \
 and never mention internal policies, approval limits or staff procedures.
 5. No guaranteed-return claims and no artificial urgency or scarcity.
-6. Reply in Arabic (or the customer's language), short and clear, using bullet points when listing items.
+6. Detect the customer's language from their question and reply in the SAME language:
+   - If the question is in Arabic  → reply entirely in Arabic.
+   - If the question is in English → reply entirely in English.
+   Keep the answer short and clear, using bullet points when listing items.
 
 Answer:
 """
+
 
 
 def build_context(hits: list[tuple[Document, float]], extra: str = "") -> str:

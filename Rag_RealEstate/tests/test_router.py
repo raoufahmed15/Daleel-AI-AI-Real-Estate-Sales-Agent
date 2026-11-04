@@ -41,3 +41,35 @@ def test_unit_lookup_codes_and_plan_flag():
     assert route("قارن بين A-019 و A-025").unit_codes == ("A-019", "A-025")
     assert route("سعر A-٠١٩").unit_codes == ("A-019",)
     assert route("ما هو EXT-10؟").intent is Intent.GENERAL
+
+
+# ═══════════════════ GREETING tests ═════════════════════════════════════════
+
+@pytest.mark.parametrize("text", [
+    # إنجليزي — كلمة واحدة
+    "hi", "hello", "hey", "howdy", "greetings", "hiya",
+    "thanks", "thank you", "thx",
+    "ok", "okay", "bye", "goodbye",
+    "good morning", "good evening",
+    "how are you", "how r u",
+    # إنجليزي — عبارة أطول قليلاً
+    "Hello there", "Hey how are you",
+    # عربي
+    "مرحبا", "أهلا", "السلام عليكم", "وعليكم السلام",
+    "صباح الخير", "صباح النور", "مساء الخير",
+    "كيف حالك", "شكرا", "شكراً", "مع السلامة",
+    "سلام", "حياك", "ازيك", "تمام", "أوكي",
+])
+def test_greetings_route_to_greeting_intent(text):
+    assert route(text).intent is Intent.GREETING, f"Expected GREETING for: {text!r}"
+
+
+@pytest.mark.parametrize("text", [
+    # تحية + سؤال عقاري = لا تُعامَل كتحية بل GENERAL أو UNIT_LOOKUP
+    "hi what is the price of unit A-019?",
+    "مرحبا كم سعر الوحدة؟",
+    "hello I want to know about payment plans",
+])
+def test_mixed_greeting_with_property_question_is_not_greeting(text):
+    assert route(text).intent is not Intent.GREETING, f"Should NOT be GREETING for: {text!r}"
+
