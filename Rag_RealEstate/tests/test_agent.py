@@ -3,7 +3,7 @@ from sqlalchemy import insert
 from datetime import date
 
 from src import inventory as inv
-from src.agent import RealEstateAgent
+from src.agent import RealEstateAgent, _detect_lang, _greeting_reply
 from src.models import HandoffReason as R
 from src.models import Status
 
@@ -112,3 +112,69 @@ def test_interaction_is_logged(tmp_path):
     with e.connect() as c:
         row = c.execute(select(inv.interaction_log)).fetchone()
     assert row.session_id == "s1" and row.reason == "opt_out" and row.status == "handoff"
+
+
+# ═══════════════════ GREETING / English tests ═══════════════════════════════
+
+@pytest.mark.parametrize("q", [
+    "hi", "hello", "hey", "Hello", "HELLO",
+    "thanks", "thank you", "bye", "goodbye",
+    "good morning", "good evening", "how are you",
+])
+def test_english_greeting_returns_answered_without_llm(engine, q):
+    """التحيات الإنجليزية يجب أن تُرجع ANSWERED فوراً بدون استدعاء LLM أو store."""
+    llm = FakeLLM()
+    res = agent(engine, store=object(), llm=llm).ask(q)
+    assert res.status is Status.ANSWERED, f"Expected ANSWERED for {q!r}, got {res.status}"
+    assert llm.calls == [], "Greeting must NOT call LLM"
+    assert res.sources == [], "Greeting must have no sources"
+
+
+@pytest.mark.parametrize("q", [
+    "مرحبا", "أهلا", "السلام عليكم", "صباح الخير",
+    "شكرا", "شكراً", "مع السلامة", "كيف حالك", "سلام",
+])
+def test_arabic_greeting_returns_answered_without_llm(engine, q):
+    """التحيات العربية يجب أن تُرجع ANSWERED فوراً بدون استدعاء LLM أو store."""
+    llm = FakeLLM()
+    res = agent(engine, store=object(), llm=llm).ask(q)
+    assert res.status is Status.ANSWERED, f"Expected ANSWERED for {q!r}, got {res.status}"
+    assert llm.calls == [], "Greeting must NOT call LLM"
+
+
+def test_english_greeting_reply_is_in_english():
+    reply = _greeting_reply("hello")
+    assert any(c.isascii() and c.isalpha() for c in reply), "English greeting should reply in English"
+    assert "👋" in reply or "Hello" in reply or "Welcome" in reply
+
+
+def test_arabic_greeting_reply_is_in_arabic():
+    reply = _greeting_reply("مرحبا")
+    assert any("\u0600" <= c <= "\u06ff" for c in reply), "Arabic greeting should reply in Arabic"
+
+
+def test_english_thanks_reply():
+    reply = _greeting_reply("thank you")
+    assert "welcome" in reply.lower() or "Welcome" in reply
+
+
+def test_detect_lang_english():
+    from src.agent import _detect_lang
+    assert _detect_lang("hello how are you") == "en"
+
+
+def test_detect_lang_arabic():
+    from src.agent import _detect_lang
+    assert _detect_lang("مرحبا كيف حالك") == "ar"
+
+
+def test_greeting_intent_logged_correctly(tmp_path):
+    """التأكد أن التحية تُسجَّل في interaction_log بحالة answered."""
+    from sqlalchemy import select
+    e = make_engine(tmp_path)
+    a = RealEstateAgent(llm=FakeLLM(), engine=e, today=TODAY, log_interactions=True)
+    a.ask("hi", session_id="s_greet")
+    with e.connect() as c:
+        row = c.execute(select(inv.interaction_log)).fetchone()
+    assert row.status == "answered" and row.intent == "greeting"
+

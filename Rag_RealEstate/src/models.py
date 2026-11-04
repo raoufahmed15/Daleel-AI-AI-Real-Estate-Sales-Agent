@@ -22,6 +22,9 @@ class HandoffReason(str, Enum):
     NO_SOURCE = "no_source"        # لا يوجد مصدر معتمد للإجابة
     UNGROUNDED = "ungrounded"      # رقم في الجواب غير موجود بالمصدر
     SYSTEM_ERROR = "system_error"  # عطل تقني (LLM أو قاعدة البيانات)
+    CUSTOMIZATION = "customization" # تعديل التقسيم الداخلي
+    FINISHING_SPECS = "finishing_specs" # مواصفات التشطيب
+    RESALE = "resale"              # إعادة البيع
 
 
 @dataclass(frozen=True)
