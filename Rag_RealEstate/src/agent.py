@@ -35,6 +35,51 @@ HANDOFF_MESSAGES = {
     HandoffReason.SYSTEM_ERROR: "حدثت مشكلة تقنية مؤقتة. سأحوّلك إلى مندوب مبيعات ليساعدك.",
 }
 
+# ردود التحية الفورية (بدون RAG أو LLM) ─────────────────────────────────────
+_EN_TRIGGERS = frozenset({
+    "hi", "hello", "hey", "howdy", "greetings", "hiya", "yo",
+    "thanks", "thank you", "thank u", "thx", "ty",
+    "ok", "okay", "cool", "great", "awesome", "perfect",
+    "bye", "goodbye", "see you", "see ya", "later", "take care",
+    "good morning", "good afternoon", "good evening", "good night",
+    "how are you", "how r u", "how are u", "how do you do",
+    "what's up", "whats up", "sup", "help", "start",
+})
+
+
+def _detect_lang(text: str) -> str:
+    """كشف بسيط: English إذا أغلب النص حروف latin."""
+    latin = sum(1 for c in text if c.isascii() and c.isalpha())
+    arabic = sum(1 for c in text if "\u0600" <= c <= "\u06ff")
+    return "en" if latin > arabic else "ar"
+
+
+def _greeting_reply(query: str) -> str:
+    """رد فوري على التحية — لا RAG ولا LLM ولا Qdrant."""
+    q = query.strip().lower()
+    lang = _detect_lang(query)
+
+    if lang == "en":
+        if any(q.startswith(t) for t in ("thank", "thx", "ty")):
+            return ("You're very welcome! 😊 "
+                    "I'm here whenever you need information about Daleel project "
+                    "units, prices, or payment plans.")
+        if any(q.startswith(t) for t in ("bye", "goodbye", "see you", "see ya", "later", "take care")):
+            return ("Goodbye! 👋 "
+                    "Feel free to reach out anytime you need help with Daleel real-estate information.")
+        return ("Hello! 👋 Welcome to Daleel AI assistant. "
+                "I can help you with information about available units, prices, "
+                "payment plans, and project specifications. What would you like to know?")
+
+    # عربي
+    if any(w in q for w in ("شكر", "مشكور", "ممنون", "تسلم", "يسلم")):
+        return "عفوًا! 😊 أنا هنا لمساعدتك في أي وقت. هل لديك سؤال عن وحدات مشروع دليل أو خطط السداد؟"
+    if any(w in q for w in ("وداع", "باي", "مع السلام")):
+        return "مع السلامة! 👋 لا تتردد في التواصل متى احتجت معلومات عن مشروع دليل."
+    return ("أهلاً بك! 👋 أنا مساعد دليل الذكي للعقارات. "
+            "أستطيع مساعدتك في الاستفسار عن الوحدات المتاحة والأسعار وخطط السداد ومواصفات المشروع. "
+            "بماذا تود أن تعرف؟")
+
 
 @lru_cache
 def get_llm():
@@ -116,8 +161,13 @@ class RealEstateAgent:
         if r.handoff_reason:
             return self._handoff(r.handoff_reason, intent)
 
+        # ── تحية / رسالة عامة بسيطة: رد فوري بدون RAG أو LLM ──────────────
+        if r.intent is Intent.GREETING:
+            return AgentResult(Status.ANSWERED, _greeting_reply(query), intent, None, [], timings=timings)
+
         extra, unit_sources = "", []
         if r.intent is Intent.UNIT_LOOKUP:
+
             t = perf_counter()
             try:
                 infos = [inv.get_unit(c, self.engine, today, _titles()) for c in r.unit_codes[:3]]
