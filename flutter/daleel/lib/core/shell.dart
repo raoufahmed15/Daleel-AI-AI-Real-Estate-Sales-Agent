@@ -45,18 +45,29 @@ class AppShell extends ConsumerWidget {
     final index = ref.watch(navIndexProvider);
     final size = MediaQuery.of(context).size;
     final wide = size.width >= 800 && size.height >= 720;
+    final scaffoldKey = GlobalKey<ScaffoldState>();
     final body = Padding(
         padding: const EdgeInsets.all(16), child: _dests[index].builder());
     final banner = Material(
-      color: Colors.amber.shade100,
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         child: Text(context.tr('demo_banner'),
-            style: const TextStyle(fontSize: 12, color: Colors.black87),
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
             textAlign: TextAlign.center),
       ),
     );
     void select(int i) => ref.read(navIndexProvider.notifier).state = i;
+    const mobileDestinations = [1, 3, 2, 0];
+    const mobileLabels = [
+      'nav_home',
+      'nav_browse',
+      'nav_leads_short',
+      'nav_chat_short',
+    ];
+    final mobileSelected = mobileDestinations.indexOf(index);
 
     if (wide) {
       return Scaffold(
@@ -92,19 +103,41 @@ class AppShell extends ConsumerWidget {
       );
     }
     return Scaffold(
-      appBar: AppBar(title: Text(context.tr(_dests[index].key))),
+      key: scaffoldKey,
+      appBar: AppBar(
+        title: Row(
+          children: [
+            const Icon(Icons.home_work_outlined, size: 25),
+            const SizedBox(width: 9),
+            Text(
+              'DALEEL',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 3,
+                  ),
+            ),
+          ],
+        ),
+      ),
       drawer: Drawer(
         child: SafeArea(
           child: ListView(children: [
             Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text('Daleel AI',
-                    style: Theme.of(context).textTheme.titleLarge)),
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+              child: Row(children: [
+                const Icon(Icons.home_work_outlined, size: 30),
+                const SizedBox(width: 12),
+                Text('Daleel AI',
+                    style: Theme.of(context).textTheme.titleLarge),
+              ]),
+            ),
             for (var i = 0; i < _dests.length; i++)
               ListTile(
                 leading: Icon(_dests[i].icon),
                 title: Text(context.tr(_dests[i].key)),
                 selected: i == index,
+                selectedColor: Theme.of(context).colorScheme.primary,
                 onTap: () {
                   select(i);
                   Navigator.pop(context);
@@ -114,6 +147,29 @@ class AppShell extends ConsumerWidget {
         ),
       ),
       body: SafeArea(child: Column(children: [banner, Expanded(child: body)])),
+      bottomNavigationBar: size.height >= 600
+          ? NavigationBar(
+              selectedIndex: mobileSelected < 0 ? 4 : mobileSelected,
+              onDestinationSelected: (selected) {
+                if (selected == 4) {
+                  scaffoldKey.currentState?.openDrawer();
+                } else {
+                  select(mobileDestinations[selected]);
+                }
+              },
+              destinations: [
+                for (var i = 0; i < mobileDestinations.length; i++)
+                  NavigationDestination(
+                    icon: Icon(_dests[mobileDestinations[i]].icon),
+                    label: context.tr(mobileLabels[i]),
+                  ),
+                NavigationDestination(
+                  icon: const Icon(Icons.grid_view_rounded),
+                  label: context.tr('more'),
+                ),
+              ],
+            )
+          : null,
     );
   }
 }

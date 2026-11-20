@@ -30,6 +30,20 @@ class _PropertiesScreenState extends ConsumerState<PropertiesScreen> {
   String sort = 'id';
 
   @override
+  void initState() {
+    super.initState();
+    final filters = ref.read(propertyFiltersProvider);
+    q.text = filters['q'] as String? ?? '';
+    location.text = filters['location'] as String? ?? '';
+    minPrice.text = filters['min_price']?.toString() ?? '';
+    maxPrice.text = filters['max_price']?.toString() ?? '';
+    minBeds.text = filters['min_bedrooms']?.toString() ?? '';
+    type = filters['property_type'] as String?;
+    availability = filters['availability'] as String?;
+    sort = filters['sort'] as String? ?? 'id';
+  }
+
+  @override
   void dispose() {
     for (final c in [q, location, minPrice, maxPrice, minBeds]) {
       c.dispose();

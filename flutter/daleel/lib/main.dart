@@ -31,8 +31,8 @@ class DaleelApp extends ConsumerWidget {
     return MaterialApp(
       title: 'Daleel AI',
       debugShowCheckedModeBanner: false,
-      theme: buildTheme(Brightness.light),
-      darkTheme: buildTheme(Brightness.dark),
+      theme: buildTheme(),
+      darkTheme: buildTheme(),
       locale: locale,
       supportedLocales: const [Locale('en'), Locale('ar')],
       localizationsDelegates: const [

@@ -30,7 +30,7 @@ final ragApiProvider = Provider<ApiClient>((ref) => ApiClient(
 final repoProvider = Provider<Repository>(
     (ref) => Repository(ref.watch(apiProvider), ref.watch(ragApiProvider)));
 final localeProvider = StateProvider<Locale>((ref) => const Locale('en'));
-final navIndexProvider = StateProvider<int>((ref) => 0);
+final navIndexProvider = StateProvider<int>((ref) => 1);
 
 final dashboardProvider =
     FutureProvider.autoDispose((ref) => ref.watch(repoProvider).dashboard());

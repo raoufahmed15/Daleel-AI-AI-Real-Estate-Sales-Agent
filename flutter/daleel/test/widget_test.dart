@@ -5,10 +5,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:daleel_ai/core/providers.dart';
 import 'package:daleel_ai/core/models.dart';
 import 'package:daleel_ai/features/conversations/conversation_screen.dart';
+import 'package:daleel_ai/features/properties/properties_screen.dart';
 import 'package:daleel_ai/main.dart';
 
 void main() {
-  testWidgets('RAG chat is the home page and dashboard remains reachable',
+  testWidgets('dashboard is the home page and RAG chat remains reachable',
       (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1200, 900);
     tester.view.devicePixelRatio = 1;
@@ -18,6 +19,21 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          propertiesProvider.overrideWith(
+            (ref) async => PageResult<Property>([
+              Property.fromJson({
+                'id': 1,
+                'code': 'V-001',
+                'title': 'Palm Residence',
+                'property_type': 'villa',
+                'location': 'New Cairo',
+                'area_sqm': 300,
+                'bedrooms': 4,
+                'price': 12500000,
+                'availability': 'available',
+              }),
+            ], 1),
+          ),
           dashboardProvider.overrideWith(
             (ref) async => {
               'calculated': {
@@ -42,12 +58,18 @@ void main() {
 
     expect(find.byType(NavigationRail), findsOneWidget);
     expect(find.text('Daleel AI'), findsOneWidget);
+    expect(find.text('Calculated from stored records'), findsOneWidget);
+    expect(find.text('Total leads'), findsOneWidget);
+    expect(find.text('Palm Residence'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.chat_bubble_outline));
+    await tester.pumpAndSettle();
     expect(
       find.textContaining('Welcome! I am Daleel’s real-estate assistant.'),
       findsOneWidget,
     );
     expect(find.byIcon(Icons.mic_none), findsOneWidget);
-    expect(find.byTooltip('Upload an image and extract its text'), findsOneWidget);
+    expect(
+        find.byTooltip('Upload an image and extract its text'), findsOneWidget);
     await tester.tap(find.byIcon(Icons.mic_none));
     await tester.pumpAndSettle();
     expect(find.text('Voice transcription privacy'), findsOneWidget);
@@ -65,6 +87,19 @@ void main() {
     tester.view.physicalSize = const Size(1200, 500);
     await tester.pumpAndSettle();
     expect(find.byType(NavigationRail), findsNothing);
+    expect(find.byType(NavigationBar), findsNothing);
+    expect(tester.takeException(), isNull);
+    tester.view.physicalSize = const Size(390, 844);
+    await tester.pumpAndSettle();
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.text('Featured properties'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.text('More'));
+    await tester.pumpAndSettle();
+    expect(find.text('Human Handoff'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.text('Human Handoff'));
+    await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
 
@@ -78,6 +113,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          propertiesProvider.overrideWith(
+            (ref) async => PageResult<Property>([], 0),
+          ),
           dashboardProvider.overrideWith(
             (ref) async => {
               'calculated': {
